@@ -12,6 +12,8 @@ import models
 PAD_token = 0
 SOS_token = 1
 EOS_token = 2
+UNK_token = 3
+
 MIN_COUNT = 3
 MAX_LENGTH = 10
 
@@ -113,7 +115,8 @@ class Trainer:
             self.start_iteration = 1
 
     def __indexes_from_sentence(self, voc, sentence):
-        return [voc.w2i[word] for word in sentence.split(' ')] + [EOS_token]
+        return [voc.w2i.get(word, 'UNK')
+                for word in sentence.split(' ')] + [EOS_token]
 
     def __zero_padding(self, l, fillvalue=PAD_token):
         return list(itertools.zip_longest(*l, fillvalue=fillvalue))

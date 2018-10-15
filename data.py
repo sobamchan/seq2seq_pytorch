@@ -4,6 +4,8 @@ import unicodedata
 PAD_token = 0
 SOS_token = 1
 EOS_token = 2
+UNK_token = 3
+
 MIN_COUNT = 3
 MAX_LENGTH = 10
 
@@ -15,8 +17,13 @@ class Voc:
         self.trimmed = False
         self.w2i = {}
         self.w2c = {}
-        self.i2w = {PAD_token: 'PAD', SOS_token: 'SOS', EOS_token: 'EOS'}
-        self.num_words = 3
+        self.i2w = {
+                PAD_token: 'PAD',
+                SOS_token: 'SOS',
+                EOS_token: 'EOS',
+                UNK_token: 'UNK'
+                }
+        self.num_words = len(self.i2w)
 
     def add_sentence(self, sentence):
         for word in sentence.split(' '):
