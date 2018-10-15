@@ -6,6 +6,7 @@ import torch.nn as nn
 import models
 from data import Voc
 from evaluator import evaluate_input
+from evaluator import evaluate_line
 from evaluator import GreedySearchDecoder
 
 
@@ -18,6 +19,8 @@ def get_args():
             required=True
             )
     p.add_argument('-use_cuda', action='store_true')
+    p.add_argument('-input_file', type=str, default=None)
+    p.add_argument('-output_file', type=str, default=None)
     return p.parse_args()
 
 
@@ -59,7 +62,18 @@ def main(args):
     decoder = decoder.to(device)
 
     searcher = GreedySearchDecoder(device, encoder, decoder)
-    evaluate_input(device, encoder, decoder, searcher, src_voc, tgt_voc)
+
+    if args.input_file:
+        preds = []
+        for l in open(args.input_file, 'r').readlines():
+            pred = evaluate_line(
+                    device, encoder, decoder, searcher, src_voc, tgt_voc, l
+                    )
+            preds.append(pred)
+        with open(args.output_file, 'w') as f:
+            f.write('\n'.join(preds))
+    else:
+        evaluate_input(device, encoder, decoder, searcher, src_voc, tgt_voc)
 
 
 if __name__ == '__main__':

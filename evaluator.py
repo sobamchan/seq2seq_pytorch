@@ -71,6 +71,18 @@ def evaluate(device, encoder, decoder, searcher,
     return decoded_words
 
 
+def evaluate_line(device, encoder, decoder, searcher, src_voc, tgt_voc, sent):
+    sent = normalize_string(sent)
+    output_words = evaluate(
+            device, encoder, decoder, searcher, src_voc,
+            tgt_voc, sent
+            )
+    output_words[:] = [x
+                       for x in output_words
+                       if not (x == 'EOS' or x == 'PAD')]
+    return ' '.join(output_words)
+
+
 def evaluate_input(device, encoder, decoder, searcher, src_voc, tgt_voc):
     input_sentence = ''
     while(1):
@@ -83,9 +95,6 @@ def evaluate_input(device, encoder, decoder, searcher, src_voc, tgt_voc):
                     device, encoder, decoder, searcher, src_voc,
                     tgt_voc, input_sentence
                     )
-            output_words[:] = [x
-                               for x in output_words
-                               if not (x == 'EOS' or x == 'PAD')]
             output_words[:] = [x
                                for x in output_words
                                if not (x == 'EOS' or x == 'PAD')]
