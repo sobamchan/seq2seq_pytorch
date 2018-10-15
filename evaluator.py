@@ -39,8 +39,7 @@ class GreedySearchDecoder(nn.Module):
 
 
 def indexes_from_sentence(voc, sentence):
-    print(sentence)
-    return [voc.w2i.get(word, 'UNK')
+    return [voc.w2i.get(word, voc.w2i['UNK'])
             for word in sentence.split(' ')] + [EOS_token]
 
 

@@ -115,7 +115,7 @@ class Trainer:
             self.start_iteration = 1
 
     def __indexes_from_sentence(self, voc, sentence):
-        return [voc.w2i.get(word, 'UNK')
+        return [voc.w2i.get(word, voc.w2i['UNK'])
                 for word in sentence.split(' ')] + [EOS_token]
 
     def __zero_padding(self, l, fillvalue=PAD_token):

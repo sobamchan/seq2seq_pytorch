@@ -15,7 +15,12 @@ class Voc:
     def __init__(self, name):
         self.name = name
         self.trimmed = False
-        self.w2i = {}
+        self.w2i = {
+                'PAD': PAD_token,
+                'SOS': SOS_token,
+                'EOS': EOS_token,
+                'UNK': UNK_token,
+                }
         self.w2c = {}
         self.i2w = {
                 PAD_token: 'PAD',
@@ -53,9 +58,19 @@ class Voc:
             len(keep_words), len(self.w2i), len(keep_words) / len(self.w2i)
             ))
 
-        self.w2i = {}
+        self.w2i = {
+                'PAD': PAD_token,
+                'SOS': SOS_token,
+                'EOS': EOS_token,
+                'UNK': UNK_token,
+                }
         self.w2c = {}
-        self.i2w = {PAD_token: 'PAD', SOS_token: 'SOS', EOS_token: 'EOS'}
+        self.i2w = {
+                PAD_token: 'PAD',
+                SOS_token: 'SOS',
+                EOS_token: 'EOS',
+                UNK_token: 'UNK'
+                }
         self.num_words = 3
 
         for word in keep_words:
@@ -83,16 +98,6 @@ def read_vocs(datafile, voc_name='voc'):
     sents = [normalize_string(l) for l in lines]
     voc = Voc(voc_name)
     return voc, sents
-
-
-def filter_pair(p):
-    return (len(p[0].split(' ')) < MAX_LENGTH)\
-            and\
-           (len(p[1].split(' ')) < MAX_LENGTH)
-
-
-def filter_pairs(pairs):
-    return [pair for pair in pairs if filter_pair(pair)]
 
 
 def load_prepare_data(corpus_name, datafile):
