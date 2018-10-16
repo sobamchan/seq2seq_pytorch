@@ -175,6 +175,10 @@ class Trainer:
         device = self.device
         encoder = self.encoder
         decoder = self.decoder
+
+        encoder.train()
+        decoder.train()
+
         encoder_optimizer = self.encoder_optimizer
         decoder_optimizer = self.decoder_optimizer
         batch_size = self.batch_size
@@ -239,6 +243,51 @@ class Trainer:
 
         return sum(print_losses) / n_totals
 
+    def calc_valid_loss(self, input_variable, lengths, target_variable,
+                        mask, max_target_len, max_length=MAX_LENGTH):
+
+        device = self.device
+        encoder = self.encoder
+        decoder = self.decoder
+
+        encoder.eval()
+        decoder.eval()
+
+        batch_size = self.batch_size
+
+        input_variable = input_variable.to(device)
+        lengths = lengths.to(device)
+        target_variable = target_variable.to(device)
+        mask = mask.to(device)
+
+        loss = 0
+        print_losses = []
+        n_totals = 0
+
+        encoder_outputs, encoder_hidden = encoder(input_variable, lengths)
+
+        decoder_input = torch.LongTensor([[SOS_token
+                                           for _ in range(batch_size)]])
+        decoder_input = decoder_input.to(device)
+
+        decoder_hidden = encoder_hidden[:decoder.layers_n]
+
+        for t in range(max_target_len):
+            decoder_output, decoder_hidden = decoder(
+                    decoder_input, decoder_hidden, encoder_outputs
+                    )
+            _, topi = decoder_output.topk(1)
+            decoder_input = torch.LongTensor([[topi[i][0]
+                                              for i in range(batch_size)]])
+            decoder_input = decoder_input.to(device)
+            mask_loss, n_total = self.__mask_nllloss(
+                    decoder_output, target_variable[t], mask[t])
+            loss += mask_loss
+            print_losses.append(mask_loss.item() * n_total)
+            n_totals += n_total
+
+        return sum(print_losses) / n_totals
+
     def train_iters(self):
         src_voc = self.src_voc
         tgt_voc = self.tgt_voc
@@ -266,7 +315,8 @@ class Trainer:
 
         print('Initializing...')
         start_iteration = 1
-        print_loss = 0
+        train_print_loss = 0
+        valid_print_loss = 0
 
         start_iteration = self.start_iteration
 
@@ -280,19 +330,34 @@ class Trainer:
                     input_variable, lengths, target_variable,
                     mask, max_target_len
                     )
-            print_loss += loss
+            train_print_loss += loss
 
             if iteration % print_every == 0:
-                print_loss_avg = print_loss / print_every
+                valid_batch =\
+                    self.__batch_to_train_data(
+                        src_voc, tgt_voc, [random.choice(self.valid_pairs)
+                                           for _ in range(batch_size)])
+                input_variable, lengths,\
+                    target_variable, mask, max_target_len = valid_batch
+
+                loss = self.calc_valid_loss(
+                        input_variable, lengths, target_variable,
+                        mask, max_target_len
+                        )
+                valid_print_loss += loss
+
+                print_loss_avg = train_print_loss / print_every
                 print(
                         'Iteration: {}; Percent complete: {:.1f}%;\
-                        Average loss {:.5f}'.format(
+                        Average loss {:.5f}; Valid loss {:.5f}'.format(
                             iteration,
                             iteration / iteration_n * 100,
-                            print_loss_avg
+                            print_loss_avg,
+                            valid_print_loss
                             )
                         )
-                print_loss = 0
+                train_print_loss = 0
+                valid_print_loss = 0
 
             if (iteration % save_every == 0):
                 directory = os.path.join(
