@@ -36,9 +36,11 @@ class Voc:
 
     def add_word(self, word):
         if word not in self.w2i:
-            self.w2i[word] = self.num_words
+            # self.w2i[word] = self.num_words
+            self.w2i[word] = len(self.w2i)
             self.w2c[word] = 1
-            self.i2w[self.num_words] = word
+            # self.i2w[self.num_words] = word
+            self.i2w[len(self.i2w)] = word
             self.num_words += 1
         else:
             self.w2c[word] += 1
@@ -71,7 +73,7 @@ class Voc:
                 EOS_token: 'EOS',
                 UNK_token: 'UNK'
                 }
-        self.num_words = 3
+        self.num_words = 4
 
         for word in keep_words:
             self.add_word(word)
