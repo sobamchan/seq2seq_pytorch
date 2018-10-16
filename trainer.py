@@ -223,8 +223,12 @@ class Trainer:
                 decoder_output, decoder_hidden = decoder(
                         decoder_input, decoder_hidden, encoder_outputs
                         )
-                _, topi = decoder_output.topk(1)
-                decoder_input = torch.LongTensor([[topi[i][0]
+                # _, topi = decoder_output.topk(1)
+                _, decoder_max = decoder_output.max(dim=1)
+                # decoder_input =\
+                #     torch.LongTensor([[topi[i][0]
+                #                        for i in range(batch_size)]])
+                decoder_input = torch.LongTensor([[decoder_max[i]
                                                   for i in range(batch_size)]])
                 decoder_input = decoder_input.to(device)
                 mask_loss, n_total = self.__mask_nllloss(
@@ -276,8 +280,11 @@ class Trainer:
             decoder_output, decoder_hidden = decoder(
                     decoder_input, decoder_hidden, encoder_outputs
                     )
-            _, topi = decoder_output.topk(1)
-            decoder_input = torch.LongTensor([[topi[i][0]
+            # _, topi = decoder_output.topk(1)
+            _, decoder_max = decoder_output.max(dim=1)
+            # decoder_input = torch.LongTensor([[topi[i][0]
+            #                                   for i in range(batch_size)]])
+            decoder_input = torch.LongTensor([[decoder_max[i]
                                               for i in range(batch_size)]])
             decoder_input = decoder_input.to(device)
             mask_loss, n_total = self.__mask_nllloss(
