@@ -424,8 +424,6 @@ class Trainer:
         if not os.path.exists(directory):
             os.makedirs(directory)
 
-        prefix = 'best' if best else iteration
-
         fname_format = '{}_{}_best.tar' if best else '{}_{}.tar'
 
         torch.save({
@@ -442,4 +440,4 @@ class Trainer:
             'args': self.args
             },
             os.path.join(directory,
-                         fname_format.format(prefix, 'checkpoint')))
+                         fname_format.format(iteration, 'checkpoint')))
