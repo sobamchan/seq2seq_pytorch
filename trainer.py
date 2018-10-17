@@ -259,7 +259,7 @@ class Trainer:
         encoder.eval()
         decoder.eval()
 
-        batch_size = self.batch_size
+        batch_size = input_variable.size(1)
 
         input_variable = input_variable.to(device)
         lengths = lengths.to(device)
@@ -351,16 +351,10 @@ class Trainer:
             ave_loss = loss_batch / batch_n
             train_print_loss += ave_loss
 
-            if ave_loss < self.best_loss:
-                print('Best loss achived!')
-                self.best_loss = ave_loss
-                self.dump_checkpoint(iteration, best=True)
-
             if iteration % print_every == 0:
                 valid_batch =\
                     self.__batch_to_train_data(
-                        src_voc, tgt_voc, [random.choice(self.valid_pairs)
-                                           for _ in range(batch_size)])
+                        src_voc, tgt_voc, self.valid_pairs)
                 input_variable, lengths,\
                     target_variable, mask, max_target_len = valid_batch
 
@@ -369,6 +363,11 @@ class Trainer:
                         mask, max_target_len
                         )
                 valid_print_loss += loss
+
+                if valid_print_loss < self.best_loss:
+                    print('Best loss achived!')
+                    self.best_loss = valid_print_loss
+                    self.dump_checkpoint(iteration, best=True)
 
                 print_loss_avg = train_print_loss / print_every
                 print(
@@ -427,6 +426,8 @@ class Trainer:
 
         prefix = 'best' if best else iteration
 
+        fname_format = '{}_{}_best.tar' if best else '{}_{}.tar'
+
         torch.save({
             'iteration': iteration,
             'en': self.encoder.state_dict(),
@@ -441,4 +442,4 @@ class Trainer:
             'args': self.args
             },
             os.path.join(directory,
-                         '{}_{}.tar'.format(prefix, 'checkpoint')))
+                         fname_format.format(prefix, 'checkpoint')))
