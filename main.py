@@ -17,6 +17,8 @@ def get_args():
     p.add_argument('-load_filename', type=str, default=None)
     p.add_argument('-save_dir', type=str, required=True)
     p.add_argument('-min_count', type=int, default=None)
+    p.add_argument('-src_voc_size', type=int, default=None)
+    p.add_argument('-tgt_voc_size', type=int, default=None)
 
     # Model config
     p.add_argument('-model_name', type=str, default='cb_model')

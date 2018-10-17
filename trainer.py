@@ -39,6 +39,11 @@ class Trainer:
         if args.min_count is not None:
             src_voc.trim(args.min_count)
             tgt_voc.trim(args.min_count)
+        else:
+            if args.src_voc_size is not None:
+                src_voc.extract_topk(args.src_voc_size)
+            if args.tgt_voc_size is not None:
+                tgt_voc.extract_topk(args.tgt_voc_size)
 
         self.save_dir = args.save_dir
 

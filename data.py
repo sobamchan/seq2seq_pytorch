@@ -1,5 +1,6 @@
 import re
 import unicodedata
+from collections import Counter
 
 PAD_token = 0
 SOS_token = 1
@@ -55,6 +56,36 @@ class Voc:
         for k, v in self.w2c.items():
             if v >= min_count:
                 keep_words.append(k)
+
+        print('keep_words {} / {} = {:.4f}'.format(
+            len(keep_words), len(self.w2i), len(keep_words) / len(self.w2i)
+            ))
+
+        self.w2i = {
+                'PAD': PAD_token,
+                'SOS': SOS_token,
+                'EOS': EOS_token,
+                'UNK': UNK_token,
+                }
+        self.w2c = {}
+        self.i2w = {
+                PAD_token: 'PAD',
+                SOS_token: 'SOS',
+                EOS_token: 'EOS',
+                UNK_token: 'UNK'
+                }
+        self.num_words = 4
+
+        for word in keep_words:
+            self.add_word(word)
+
+    def extract_topk(self, topk):
+        if self.trimmed:
+            return
+        self.trimmed = True
+
+        counter = Counter(self.w2c)
+        keep_words = [v[0] for v in counter.most_common(topk)]
 
         print('keep_words {} / {} = {:.4f}'.format(
             len(keep_words), len(self.w2i), len(keep_words) / len(self.w2i)
