@@ -39,7 +39,7 @@ def get_args():
 
     # Visualize config
     p.add_argument('-print_every', type=int, default=1)
-    p.add_argument('-save_every', type=int, default=500)
+    p.add_argument('-save_every', type=int, default=5)
 
     return p.parse_args()
 

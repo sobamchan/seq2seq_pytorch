@@ -63,6 +63,8 @@ class Trainer:
         self.print_every = args.print_every
         self.save_every = args.save_every
 
+        self.best_loss = 1e+10
+
         if load_filename is not None:
             checkpoint = torch.load(load_filename)
             encoder_sd = checkpoint['en']
@@ -169,7 +171,7 @@ class Trainer:
         loss = loss.to(device)
         return loss, n_total.item()
 
-    def train_one_epoch(self, input_variable, lengths, target_variable,
+    def train_one_batch(self, input_variable, lengths, target_variable,
                         mask, max_target_len, max_length=MAX_LENGTH):
 
         device = self.device
@@ -181,7 +183,7 @@ class Trainer:
 
         encoder_optimizer = self.encoder_optimizer
         decoder_optimizer = self.decoder_optimizer
-        batch_size = self.batch_size
+        batch_size = input_variable.size(1)
         clip = self.clip
 
         encoder_optimizer.zero_grad()
@@ -302,23 +304,14 @@ class Trainer:
 
         batch_size = self.batch_size
         iteration_n = self.iteration_n
-        encoder = self.encoder
-        decoder = self.decoder
-        src_embedding = self.src_embedding
-        tgt_embedding = self.tgt_embedding
-        encoder_optimizer = self.encoder_optimizer
-        decoder_optimizer = self.decoder_optimizer
         print_every = self.print_every
         save_every = self.save_every
-        save_dir = self.save_dir
-        model_name = self.model_name
-        corpus_name = self.corpus_name
 
-        training_batches =\
-            [self.__batch_to_train_data(
-                src_voc, tgt_voc, [random.choice(pairs)
-                                   for _ in range(batch_size)])
-             for _ in range(iteration_n)]
+        # training_batches =\
+        #     [self.__batch_to_train_data(
+        #         src_voc, tgt_voc, [random.choice(pairs)
+        #                            for _ in range(batch_size)])
+        #      for _ in range(iteration_n)]
 
         print('Initializing...')
         start_iteration = 1
@@ -329,15 +322,39 @@ class Trainer:
 
         print('Training...')
         for iteration in range(start_iteration, iteration_n + 1):
-            training_batch = training_batches[iteration - 1]
-            input_variable, lengths, target_variable, mask, max_target_len =\
-                training_batch
+            # training_batch = training_batches[iteration - 1]
+            # input_variable, lengths, target_variable, mask, max_target_len =\
+            #     training_batch
 
-            loss = self.train_one_epoch(
-                    input_variable, lengths, target_variable,
-                    mask, max_target_len
-                    )
-            train_print_loss += loss
+            loss_batch = 0
+            batch_n = 0
+            random.shuffle(pairs)
+            for start_idx in range(0, len(pairs), batch_size):
+
+                # Select samples for batch
+                end_idx = start_idx + batch_size
+                end_idx = end_idx if end_idx < len(pairs) else len(pairs)
+                pairs_batch = pairs[start_idx:end_idx]
+                training_batch = self.__batch_to_train_data(
+                        src_voc, tgt_voc, pairs_batch
+                        )
+                input_variable, lengths, target_variable,\
+                    mask, max_target_len = training_batch
+
+                loss = self.train_one_batch(
+                        input_variable, lengths, target_variable,
+                        mask, max_target_len
+                        )
+                loss_batch += loss
+                batch_n += 1
+
+            ave_loss = loss_batch / batch_n
+            train_print_loss += ave_loss
+
+            if ave_loss < self.best_loss:
+                print('Best loss achived!')
+                self.best_loss = ave_loss
+                self.dump_checkpoint(iteration, best=True)
 
             if iteration % print_every == 0:
                 valid_batch =\
@@ -367,26 +384,61 @@ class Trainer:
                 valid_print_loss = 0
 
             if (iteration % save_every == 0):
-                directory = os.path.join(
-                        save_dir, model_name, corpus_name, '{}-{}_{}'.format(
-                            self.encoder_layers_n,
-                            self.decoder_layers_n,
-                            self.hid_n
-                            ))
-                if not os.path.exists(directory):
-                    os.makedirs(directory)
-                torch.save({
-                    'iteration': iteration,
-                    'en': encoder.state_dict(),
-                    'de': decoder.state_dict(),
-                    'en_opt': encoder_optimizer.state_dict(),
-                    'de_opt': decoder_optimizer.state_dict(),
-                    'loss': loss,
-                    'src_voc_dict': src_voc.__dict__,
-                    'tgt_voc_dict': tgt_voc.__dict__,
-                    'src_embedding': src_embedding.state_dict(),
-                    'tgt_embedding': tgt_embedding.state_dict(),
-                    'args': self.args
-                    },
-                    os.path.join(directory,
-                                 '{}_{}.tar'.format(iteration, 'checkpoint')))
+                self.dump_checkpoint(iteration)
+                # directory = os.path.join(
+                #         save_dir, model_name, corpus_name, '{}-{}_{}'.format(
+                #             self.encoder_layers_n,
+                #             self.decoder_layers_n,
+                #             self.hid_n
+                #             ))
+                # if not os.path.exists(directory):
+                #     os.makedirs(directory)
+                # torch.save({
+                #     'iteration': iteration,
+                #     'en': encoder.state_dict(),
+                #     'de': decoder.state_dict(),
+                #     'en_opt': encoder_optimizer.state_dict(),
+                #     'de_opt': decoder_optimizer.state_dict(),
+                #     'loss': loss,
+                #     'src_voc_dict': src_voc.__dict__,
+                #     'tgt_voc_dict': tgt_voc.__dict__,
+                #     'src_embedding': src_embedding.state_dict(),
+                #     'tgt_embedding': tgt_embedding.state_dict(),
+                #     'args': self.args
+                #     },
+                #     os.path.join(directory,
+                #                  '{}_{}.tar'.format(iteration,
+                #                                     'checkpoint')))
+
+    def dump_checkpoint(self, iteration, best=False):
+        save_dir = self.save_dir
+        model_name = self.model_name
+        corpus_name = self.corpus_name
+
+        directory = os.path.join(
+                save_dir, model_name, corpus_name, '{}-{}_{}'.format(
+                    self.encoder_layers_n,
+                    self.decoder_layers_n,
+                    self.hid_n
+                    ))
+
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+
+        prefix = 'best' if best else iteration
+
+        torch.save({
+            'iteration': iteration,
+            'en': self.encoder.state_dict(),
+            'de': self.decoder.state_dict(),
+            'en_opt': self.encoder_optimizer.state_dict(),
+            'de_opt': self.decoder_optimizer.state_dict(),
+            # 'loss': loss,
+            'src_voc_dict': self.src_voc.__dict__,
+            'tgt_voc_dict': self.tgt_voc.__dict__,
+            'src_embedding': self.src_embedding.state_dict(),
+            'tgt_embedding': self.tgt_embedding.state_dict(),
+            'args': self.args
+            },
+            os.path.join(directory,
+                         '{}_{}.tar'.format(prefix, 'checkpoint')))
