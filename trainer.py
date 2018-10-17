@@ -14,7 +14,6 @@ SOS_token = 1
 EOS_token = 2
 UNK_token = 3
 
-MIN_COUNT = 3
 MAX_LENGTH = 10
 
 
@@ -36,6 +35,10 @@ class Trainer:
 
         train_pairs = list(zip(src_train_sents, tgt_train_sents))
         valid_pairs = list(zip(src_valid_sents, tgt_valid_sents))
+
+        if args.min_count is not None:
+            src_voc.trim(args.min_count)
+            tgt_voc.trim(args.min_count)
 
         self.save_dir = args.save_dir
 
