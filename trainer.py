@@ -233,11 +233,7 @@ class Trainer:
                 decoder_output, decoder_hidden = decoder(
                         decoder_input, decoder_hidden, encoder_outputs
                         )
-                # _, topi = decoder_output.topk(1)
                 _, decoder_max = decoder_output.max(dim=1)
-                # decoder_input =\
-                #     torch.LongTensor([[topi[i][0]
-                #                        for i in range(batch_size)]])
                 decoder_input = torch.LongTensor([[decoder_max[i]
                                                   for i in range(batch_size)]])
                 decoder_input = decoder_input.to(device)
@@ -290,10 +286,7 @@ class Trainer:
             decoder_output, decoder_hidden = decoder(
                     decoder_input, decoder_hidden, encoder_outputs
                     )
-            # _, topi = decoder_output.topk(1)
             _, decoder_max = decoder_output.max(dim=1)
-            # decoder_input = torch.LongTensor([[topi[i][0]
-            #                                   for i in range(batch_size)]])
             decoder_input = torch.LongTensor([[decoder_max[i]
                                               for i in range(batch_size)]])
             decoder_input = decoder_input.to(device)
@@ -315,12 +308,6 @@ class Trainer:
         print_every = self.print_every
         save_every = self.save_every
 
-        # training_batches =\
-        #     [self.__batch_to_train_data(
-        #         src_voc, tgt_voc, [random.choice(pairs)
-        #                            for _ in range(batch_size)])
-        #      for _ in range(iteration_n)]
-
         print('Initializing...')
         start_iteration = 1
         train_print_loss = 0
@@ -330,9 +317,6 @@ class Trainer:
 
         print('Training...')
         for iteration in range(start_iteration, iteration_n + 1):
-            # training_batch = training_batches[iteration - 1]
-            # input_variable, lengths, target_variable, mask, max_target_len =\
-            #     training_batch
 
             loss_batch = 0
             batch_n = 0
@@ -355,6 +339,9 @@ class Trainer:
                         )
                 loss_batch += loss
                 batch_n += 1
+
+                if batch_n % 100 == 0:
+                    print('loss: {:.5f}'.format(loss))
 
             ave_loss = loss_batch / batch_n
             train_print_loss += ave_loss
@@ -392,30 +379,6 @@ class Trainer:
 
             if (iteration % save_every == 0):
                 self.dump_checkpoint(iteration)
-                # directory = os.path.join(
-                #         save_dir, model_name, corpus_name, '{}-{}_{}'.format(
-                #             self.encoder_layers_n,
-                #             self.decoder_layers_n,
-                #             self.hid_n
-                #             ))
-                # if not os.path.exists(directory):
-                #     os.makedirs(directory)
-                # torch.save({
-                #     'iteration': iteration,
-                #     'en': encoder.state_dict(),
-                #     'de': decoder.state_dict(),
-                #     'en_opt': encoder_optimizer.state_dict(),
-                #     'de_opt': decoder_optimizer.state_dict(),
-                #     'loss': loss,
-                #     'src_voc_dict': src_voc.__dict__,
-                #     'tgt_voc_dict': tgt_voc.__dict__,
-                #     'src_embedding': src_embedding.state_dict(),
-                #     'tgt_embedding': tgt_embedding.state_dict(),
-                #     'args': self.args
-                #     },
-                #     os.path.join(directory,
-                #                  '{}_{}.tar'.format(iteration,
-                #                                     'checkpoint')))
 
     def dump_checkpoint(self, iteration, best=False):
         save_dir = self.save_dir
@@ -440,7 +403,6 @@ class Trainer:
             'de': self.decoder.state_dict(),
             'en_opt': self.encoder_optimizer.state_dict(),
             'de_opt': self.decoder_optimizer.state_dict(),
-            # 'loss': loss,
             'src_voc_dict': self.src_voc.__dict__,
             'tgt_voc_dict': self.tgt_voc.__dict__,
             'src_embedding': self.src_embedding.state_dict(),
