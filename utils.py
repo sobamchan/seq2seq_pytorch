@@ -45,6 +45,12 @@ class Trainer:
         for o in self.optimizers:
             o.step()
 
+    def train_one_epoch(self):
+
+        self.corpus.initialize()
+        while not self.corpus.is_final_batch:
+            self.step()
+
 
 class Translator:
 
