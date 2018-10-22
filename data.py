@@ -109,6 +109,12 @@ class Voc:
         for word in keep_words:
             self.add_word(word)
 
+    def sent2idx(self, sent):
+        return [
+                self.w2i.get(word, self.w2i['UNK'])
+                for word in sent.split(' ')
+                ] + [self.w2i['UNK']]
+
 
 def unicode_to_ascii(s):
     return ''.join(
