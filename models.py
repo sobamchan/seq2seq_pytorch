@@ -11,11 +11,11 @@ MAX_LENGTH = 10
 
 class EncoderRNN(nn.Module):
 
-    def __init__(self, hid_n, embedding, layers_n=1, dropout=0):
+    def __init__(self, hid_n, emb_size, layers_n=1, dropout=0):
         super(EncoderRNN, self).__init__()
         self.layers_n = layers_n
         self.hid_n = hid_n
-        self.embedding = embedding
+        self.emb_size = emb_size
 
         self.gru = nn.GRU(
                 hid_n,
@@ -25,8 +25,8 @@ class EncoderRNN(nn.Module):
                 bidirectional=True
                 )
 
-    def forward(self, inp_seq, inp_lengths, hid=None):
-        embedded = self.embedding(inp_seq)
+    def forward(self, inp_seq, inp_lengths, embedding, hid=None):
+        embedded = embedding(inp_seq)
         packed = nn.utils.rnn.pack_padded_sequence(embedded, inp_lengths)
         outputs, hidden = self.gru(packed, hid)
         outputs, _ = nn.utils.rnn.pad_packed_sequence(outputs)
@@ -95,7 +95,7 @@ class LinearGenerator(nn.Module):
 
 class LuongAttnDecoderRNN(nn.Module):
 
-    def __init__(self, attn_model, embedding, hid_n,
+    def __init__(self, attn_model, emb_size, hid_n,
                  output_size, layers_n=1, dropout=0.1):
         super(LuongAttnDecoderRNN, self).__init__()
         self.attn_model = attn_model
@@ -104,7 +104,7 @@ class LuongAttnDecoderRNN(nn.Module):
         self.layers_n = layers_n
         self.dropout = dropout
 
-        self.embedding = embedding
+        self.emb_size = emb_size
         self.embedding_dropout = nn.Dropout(dropout)
         self.gru = nn.GRU(
                 hid_n,
@@ -115,9 +115,10 @@ class LuongAttnDecoderRNN(nn.Module):
         self.concat = nn.Linear(hid_n * 2, hid_n)
         self.attn = Attn(attn_model, hid_n)
 
-    def forward(self, input_step, last_hid, encoder_outputs, generator):
+    def forward(self, input_step, last_hid, encoder_outputs,
+                generator, embedding):
         # Note: we run this one step (word) at a time
-        embedded = self.embedding(input_step)
+        embedded = embedding(input_step)
         embedded = self.embedding_dropout(embedded)
         rnn_output, hid = self.gru(embedded, last_hid)
         attn_weights = self.attn(rnn_output, encoder_outputs)

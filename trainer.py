@@ -8,6 +8,9 @@ import torch.optim as optim
 
 import data
 import models
+from corpus import CorpusReader
+from utils import Translator
+from utils import Trainer
 
 PAD_token = 0
 SOS_token = 1
@@ -33,9 +36,6 @@ class Runner:
                     args.valid_tgt
                     )
 
-        train_pairs = list(zip(src_train_sents, tgt_train_sents))
-        valid_pairs = list(zip(src_valid_sents, tgt_valid_sents))
-
         if args.min_count is not None:
             src_voc.trim(args.min_count)
             tgt_voc.trim(args.min_count)
@@ -49,8 +49,6 @@ class Runner:
 
         self.src_voc = src_voc
         self.tgt_voc = tgt_voc
-        self.train_pairs = train_pairs
-        self.valid_pairs = valid_pairs
 
         device = torch.device('cuda' if args.use_cuda else 'cpu')
         self.device = device
@@ -95,10 +93,10 @@ class Runner:
         self.tgt_embedding = tgt_embedding
 
         encoder = models.EncoderRNN(
-                self.hid_n, src_embedding, self.encoder_layers_n, self.dropout
+                self.hid_n, self.hid_n, self.encoder_layers_n, self.dropout
                 )
         decoder = models.LuongAttnDecoderRNN(
-                self.attn_model, tgt_embedding, self.hid_n,
+                self.attn_model, self.hid_n, self.hid_n,
                 self.tgt_voc.num_words, self.decoder_layers_n, self.dropout
                 )
         generator = models.LinearGenerator(self.hid_n, self.tgt_voc.num_words)
@@ -122,6 +120,14 @@ class Runner:
                 generator.parameters(),
                 lr=self.learning_rate * self.decoder_learning_ratio
                 )
+        src_embedding_optimizer = optim.Adam(
+                src_embedding.parameters(),
+                lr=self.learning_rate
+                )
+        tgt_embedding_optimizer = optim.Adam(
+                tgt_embedding.parameters(),
+                lr=self.learning_rate * self.decoder_learning_ratio
+                )
 
         if load_filename:
             encoder_optimizer.load_state_dict(encoder_optimizer_sd)
@@ -129,6 +135,48 @@ class Runner:
         self.encoder_optimizer = encoder_optimizer
         self.decoder_optimizer = decoder_optimizer
         self.generator_optimizer = generator_optimizer
+        self.src_embedding_optimizer = src_embedding_optimizer
+        self.tgt_embedding_optimizer = tgt_embedding_optimizer
+
+        train_corpus = CorpusReader(
+                src_train_sents,
+                tgt_train_sents,
+                src_voc,
+                tgt_voc,
+                args.batch_size
+                )
+        train_translator = Translator(
+                src_embedding,
+                tgt_embedding,
+                generator,
+                src_voc,
+                tgt_voc,
+                self.encoder,
+                self.decoder,
+                args.teacher_forcing_ratio,
+                device
+                )
+        train_trainer = Trainer(
+                train_corpus,
+                (
+                    encoder_optimizer,
+                    decoder_optimizer,
+                    generator_optimizer,
+                    src_embedding_optimizer,
+                    tgt_embedding_optimizer,
+                    ),
+                train_translator,
+                self.batch_size,
+                self.clip
+                )
+
+        valid_corpus = CorpusReader(
+                src_valid_sents,
+                tgt_valid_sents,
+                src_voc,
+                tgt_voc,
+                args.batch_size
+                )
 
         if load_filename is not None:
             self.start_iteration = checkpoint['iteration'] + 1
