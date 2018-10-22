@@ -48,11 +48,16 @@ def main(args):
             checkpoint['args'].decoder_layers_n,
             checkpoint['args'].dropout
             )
+    generator = models.LinearGenerator(
+            checkpoint['args'].hid_n,
+            tgt_voc.num_words
+            )
 
     src_embedding.load_state_dict(checkpoint['src_embedding'])
     tgt_embedding.load_state_dict(checkpoint['tgt_embedding'])
     encoder.load_state_dict(checkpoint['en'])
     decoder.load_state_dict(checkpoint['de'])
+    generator.load_state_dict(checkpoint['generator'])
 
     device = torch.device('cuda' if args.use_cuda else 'cpu')
 
@@ -60,20 +65,25 @@ def main(args):
     tgt_embedding = tgt_embedding.to(device)
     encoder = encoder.to(device)
     decoder = decoder.to(device)
+    generator = generator.to(device)
 
-    searcher = GreedySearchDecoder(device, encoder, decoder)
+    searcher = GreedySearchDecoder(device, encoder, decoder, generator)
 
     if args.input_file:
         preds = []
         for l in open(args.input_file, 'r').readlines():
             pred = evaluate_line(
-                    device, encoder, decoder, searcher, src_voc, tgt_voc, l
+                    device, encoder, decoder, generator,
+                    searcher, src_voc, tgt_voc, l
                     )
             preds.append(pred)
         with open(args.output_file, 'w') as f:
             f.write('\n'.join(preds))
     else:
-        evaluate_input(device, encoder, decoder, searcher, src_voc, tgt_voc)
+        evaluate_input(
+                device, encoder, decoder, generator,
+                searcher, src_voc, tgt_voc
+                )
 
 
 if __name__ == '__main__':

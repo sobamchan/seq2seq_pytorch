@@ -11,11 +11,12 @@ MAX_LENGTH = 10
 
 class GreedySearchDecoder(nn.Module):
 
-    def __init__(self, device, encoder, decoder):
+    def __init__(self, device, encoder, decoder, generator):
         super(GreedySearchDecoder, self).__init__()
         self.device = device
         self.encoder = encoder
         self.decoder = decoder
+        self.generator = generator
 
     def forward(self, inp_seq, inp_lengths, max_length):
         device = self.device
@@ -29,7 +30,8 @@ class GreedySearchDecoder(nn.Module):
 
         for _ in range(max_length):
             decoder_output, decoder_hidden =\
-                self.decoder(decoder_input, decoder_hidden, encoder_outputs)
+                self.decoder(decoder_input, decoder_hidden, encoder_outputs,
+                             self.generator)
             decoder_scores, decoder_input = torch.max(decoder_output, dim=1)
             all_tokens = torch.cat((all_tokens, decoder_input), dim=0)
             all_scores = torch.cat((all_scores, decoder_scores), dim=0)
@@ -59,7 +61,7 @@ def unicode_to_ascii(s):
             )
 
 
-def evaluate(device, encoder, decoder, searcher,
+def evaluate(device, encoder, decoder, generator, searcher,
              src_voc, tgt_voc, sentence, max_length=MAX_LENGTH):
     indexes_batch = [indexes_from_sentence(src_voc, sentence)]
     lengths = torch.tensor([len(indexes) for indexes in indexes_batch])
@@ -71,10 +73,11 @@ def evaluate(device, encoder, decoder, searcher,
     return decoded_words
 
 
-def evaluate_line(device, encoder, decoder, searcher, src_voc, tgt_voc, sent):
+def evaluate_line(device, encoder, decoder, generator,
+                  searcher, src_voc, tgt_voc, sent):
     sent = normalize_string(sent)
     output_words = evaluate(
-            device, encoder, decoder, searcher, src_voc,
+            device, encoder, decoder, generator, searcher, src_voc,
             tgt_voc, sent
             )
     output_words[:] = [x
