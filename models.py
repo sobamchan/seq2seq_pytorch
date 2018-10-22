@@ -82,6 +82,17 @@ class Attn(nn.Module):
         return F.softmax(attn_energies, dim=1).unsqueeze(1)
 
 
+class LinearGenerator(nn.Module):
+
+    def __init__(self, hid_n, output_size):
+        super(LinearGenerator, self).__init__()
+        self.out = nn.Linear(hid_n, output_size)
+        self.logsoftmax = nn.Softmax(dim=1)
+
+    def forward(self, hid):
+        return self.logsoftmax(self.out(hid))
+
+
 class LuongAttnDecoderRNN(nn.Module):
 
     def __init__(self, attn_model, embedding, hid_n,
@@ -102,10 +113,9 @@ class LuongAttnDecoderRNN(nn.Module):
                 dropout=(0 if layers_n == 1 else dropout)
                 )
         self.concat = nn.Linear(hid_n * 2, hid_n)
-        self.out = nn.Linear(hid_n, output_size)
         self.attn = Attn(attn_model, hid_n)
 
-    def forward(self, input_step, last_hid, encoder_outputs):
+    def forward(self, input_step, last_hid, encoder_outputs, generator):
         # Note: we run this one step (word) at a time
         embedded = self.embedding(input_step)
         embedded = self.embedding_dropout(embedded)
@@ -118,7 +128,6 @@ class LuongAttnDecoderRNN(nn.Module):
         concat_input = torch.cat((rnn_output, context), 1)
         concat_output = torch.tanh(self.concat(concat_input))
 
-        output = self.out(concat_output)
-        output = F.softmax(output, dim=1)
+        output = generator(concat_output)
 
         return output, hid

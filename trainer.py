@@ -77,6 +77,7 @@ class Trainer:
             checkpoint = torch.load(load_filename)
             encoder_sd = checkpoint['en']
             decoder_sd = checkpoint['de']
+            generator_sd = checkpoint['generator']
             encoder_optimizer_sd = checkpoint['en_opt']
             decoder_optimizer_sd = checkpoint['de_opt']
             src_embedding_sd = checkpoint['src_embedding']
@@ -100,12 +101,16 @@ class Trainer:
                 self.attn_model, tgt_embedding, self.hid_n,
                 self.tgt_voc.num_words, self.decoder_layers_n, self.dropout
                 )
+        generator = models.LinearGenerator(self.hid_n, self.tgt_voc.num_words)
+
         if load_filename:
             encoder.load_state_dict(encoder_sd)
             decoder.load_state_dict(decoder_sd)
+            generator.load_state_dict(generator_sd)
 
         self.encoder = encoder.to(device)
         self.decoder = decoder.to(device)
+        self.generator = generator.to(device)
 
         encoder_optimizer = optim.Adam(
                 encoder.parameters(), lr=self.learning_rate)
@@ -113,11 +118,17 @@ class Trainer:
                 decoder.parameters(),
                 lr=self.learning_rate * self.decoder_learning_ratio
                 )
+        generator_optimizer = optim.Adam(
+                generator.parameters(),
+                lr=self.learning_rate * self.decoder_learning_ratio
+                )
+
         if load_filename:
             encoder_optimizer.load_state_dict(encoder_optimizer_sd)
             decoder_optimizer.load_state_dict(decoder_optimizer_sd)
         self.encoder_optimizer = encoder_optimizer
         self.decoder_optimizer = decoder_optimizer
+        self.generator_optimizer = generator_optimizer
 
         if load_filename is not None:
             self.start_iteration = checkpoint['iteration'] + 1
@@ -185,17 +196,22 @@ class Trainer:
         device = self.device
         encoder = self.encoder
         decoder = self.decoder
+        generator = self.generator
 
         encoder.train()
         decoder.train()
+        generator.train()
 
         encoder_optimizer = self.encoder_optimizer
         decoder_optimizer = self.decoder_optimizer
+        generator_optimizer = self.generator_optimizer
+
         batch_size = input_variable.size(1)
         clip = self.clip
 
         encoder_optimizer.zero_grad()
         decoder_optimizer.zero_grad()
+        generator_optimizer.zero_grad()
 
         input_variable = input_variable.to(device)
         lengths = lengths.to(device)
@@ -220,7 +236,8 @@ class Trainer:
         if use_teacher_forcing:
             for t in range(max_target_len):
                 decoder_output, decoder_hidden = decoder(
-                        decoder_input, decoder_hidden, encoder_outputs
+                        decoder_input, decoder_hidden, encoder_outputs,
+                        generator
                         )
                 decoder_input = target_variable[t].view(1, -1)
                 mask_loss, n_total = self.__mask_nllloss(
@@ -231,7 +248,8 @@ class Trainer:
         else:
             for t in range(max_target_len):
                 decoder_output, decoder_hidden = decoder(
-                        decoder_input, decoder_hidden, encoder_outputs
+                        decoder_input, decoder_hidden, encoder_outputs,
+                        generator
                         )
                 _, decoder_max = decoder_output.max(dim=1)
                 decoder_input = torch.LongTensor([[decoder_max[i]
@@ -247,9 +265,11 @@ class Trainer:
 
         nn.utils.clip_grad_norm_(encoder.parameters(), clip)
         nn.utils.clip_grad_norm_(decoder.parameters(), clip)
+        nn.utils.clip_grad_norm_(generator.parameters(), clip)
 
         encoder_optimizer.step()
         decoder_optimizer.step()
+        generator_optimizer.step()
 
         return sum(print_losses) / n_totals
 
@@ -259,9 +279,11 @@ class Trainer:
         device = self.device
         encoder = self.encoder
         decoder = self.decoder
+        generator = self.generator
 
         encoder.eval()
         decoder.eval()
+        generator.eval()
 
         batch_size = input_variable.size(1)
 
@@ -284,7 +306,8 @@ class Trainer:
 
         for t in range(max_target_len):
             decoder_output, decoder_hidden = decoder(
-                    decoder_input, decoder_hidden, encoder_outputs
+                    decoder_input, decoder_hidden, encoder_outputs,
+                    generator
                     )
             _, decoder_max = decoder_output.max(dim=1)
             decoder_input = torch.LongTensor([[decoder_max[i]
