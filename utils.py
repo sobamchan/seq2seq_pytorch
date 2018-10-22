@@ -1,15 +1,17 @@
 import random
 
 import torch
+import torch.nn as nn
 
 
 class Trainer:
 
-    def __init__(self, corpus, optimizers, translator, batch_size):
+    def __init__(self, corpus, optimizers, translator, batch_size, clip):
         self.corpus = corpus
         self.optimizers = optimizers
         self.translator = translator
         self.batch_size = batch_size
+        self.clip = clip
 
     def step(self):
         # Reset gradients
@@ -17,11 +19,31 @@ class Trainer:
             o.zero_grad()
 
         # Prepare dataset
+        src, lens, tgt, mask, max_target_len, is_final =\
+            self.corpus.next_batch()
 
         # Compute loss
+        translator = self.translator
+        loss = translator.score(
+                src=src,
+                lens=lens,
+                tgt=tgt,
+                mask=mask,
+                max_target_len=max_target_len,
+                train=True
+                )
 
         # Clipping, backpropagate, optimize
-        pass
+        loss.backward()
+
+        nn.utils.clip_grad_norm_(translator.encoder, self.clip)
+        nn.utils.clip_grad_norm_(translator.decoder, self.clip)
+        nn.utils.clip_grad_norm_(translator.encoder_embedding, self.clip)
+        nn.utils.clip_grad_norm_(translator.decoder_embedding, self.clip)
+        nn.utils.clip_grad_norm_(translator.generator, self.clip)
+
+        for o in self.optimizers:
+            o.step()
 
 
 class Translator:
