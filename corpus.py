@@ -14,6 +14,7 @@ class CorpusReader:
         self.tgt_voc = tgt_voc
 
         self.current_idx = 0
+        self.is_final_batch = False
         self.batch_size = batch_size
 
     def prepare(self, sents):
@@ -70,15 +71,13 @@ class CorpusReader:
         end_idx = start_idx + self.batch_size
         self.current_idx += self.batch_size
 
-        is_final_batch = False
-
         if end_idx > self.pairs_n:
             end_idx = self.pairs_n
             self.initialize()
-            is_final_batch = True
+            self.is_final_batch = True
 
         pair_batch = self.pairs[start_idx:end_idx]
         src, lens, tgt, mask, max_target_len =\
             self.__batch_to_train_data(self.src_voc, self.tgt_voc, pair_batch)
 
-        return src, lens, tgt, mask, max_target_len, is_final_batch
+        return src, lens, tgt, mask, max_target_len
