@@ -17,7 +17,7 @@ UNK_token = 3
 MAX_LENGTH = 10
 
 
-class Trainer:
+class Runner:
 
     def __init__(self, args):
         self.args = args

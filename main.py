@@ -1,6 +1,6 @@
 import argparse
 
-from trainer import Trainer
+from trainer import Runner
 
 
 def get_args():
@@ -47,8 +47,8 @@ def get_args():
 
 
 def main(args):
-    t = Trainer(args)
-    t.train_iters()
+    r = Runner(args)
+    r.train_iters()
 
 
 if __name__ == '__main__':
