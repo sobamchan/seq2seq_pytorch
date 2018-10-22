@@ -4,7 +4,24 @@ import torch
 
 
 class Trainer:
-    pass
+
+    def __init__(self, corpus, optimizers, translator, batch_size):
+        self.corpus = corpus
+        self.optimizers = optimizers
+        self.translator = translator
+        self.batch_size = batch_size
+
+    def step(self):
+        # Reset gradients
+        for o in self.optimizers:
+            o.zero_grad()
+
+        # Prepare dataset
+
+        # Compute loss
+
+        # Clipping, backpropagate, optimize
+        pass
 
 
 class Translator:
