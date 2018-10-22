@@ -424,6 +424,7 @@ class Trainer:
             'iteration': iteration,
             'en': self.encoder.state_dict(),
             'de': self.decoder.state_dict(),
+            'generator': self.generator.state_dict(),
             'en_opt': self.encoder_optimizer.state_dict(),
             'de_opt': self.decoder_optimizer.state_dict(),
             'src_voc_dict': self.src_voc.__dict__,
