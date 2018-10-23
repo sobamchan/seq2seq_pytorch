@@ -197,16 +197,15 @@ class Translator:
     def greedy(self, sentences):
         searcher = GreedySearchDecoder(
                 self.device,
+                self.encoder_embedding,
+                self.decoder_embedding,
+                self.generator,
                 self.encoder,
-                self.decoder,
-                self.generator
+                self.decoder
                 )
         pred_sentences = [
                 evaluate_line(
                     self.device,
-                    self.encoder,
-                    self.decoder,
-                    self.generator,
                     searcher,
                     self.src_voc,
                     self.tgt_voc,

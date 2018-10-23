@@ -11,17 +11,22 @@ MAX_LENGTH = 10
 
 class GreedySearchDecoder(nn.Module):
 
-    def __init__(self, device, encoder, decoder, generator):
+    def __init__(self, device, encoder_embedding, decoder_embedding,
+                 generator, encoder, decoder):
         super(GreedySearchDecoder, self).__init__()
         self.device = device
+        self.encoder_embedding = encoder_embedding
+        self.decoder_embedding = decoder_embedding
+        self.generator = generator
         self.encoder = encoder
         self.decoder = decoder
-        self.generator = generator
 
     def forward(self, inp_seq, inp_lengths, max_length):
         device = self.device
 
-        encoder_outputs, encoder_hidden = self.encoder(inp_seq, inp_lengths)
+        encoder_outputs, encoder_hidden = self.encoder(
+                inp_seq, inp_lengths, embedding=self.encoder_embedding
+                )
         decoder_hidden = encoder_hidden[:self.decoder.layers_n]
         decoder_input =\
             torch.ones(1, 1, device=device, dtype=torch.long) * SOS_token
@@ -31,7 +36,7 @@ class GreedySearchDecoder(nn.Module):
         for _ in range(max_length):
             decoder_output, decoder_hidden =\
                 self.decoder(decoder_input, decoder_hidden, encoder_outputs,
-                             self.generator)
+                             self.generator, self.decoder_embedding)
             decoder_scores, decoder_input = torch.max(decoder_output, dim=1)
             all_tokens = torch.cat((all_tokens, decoder_input), dim=0)
             all_scores = torch.cat((all_scores, decoder_scores), dim=0)
@@ -61,7 +66,7 @@ def unicode_to_ascii(s):
             )
 
 
-def evaluate(device, encoder, decoder, generator, searcher,
+def evaluate(device, searcher,
              src_voc, tgt_voc, sentence, max_length=MAX_LENGTH):
     indexes_batch = [src_voc.sent2idx(sentence)]
     lengths = torch.tensor([len(indexes) for indexes in indexes_batch])
@@ -73,12 +78,10 @@ def evaluate(device, encoder, decoder, generator, searcher,
     return decoded_words
 
 
-def evaluate_line(device, encoder, decoder, generator,
-                  searcher, src_voc, tgt_voc, sent):
+def evaluate_line(device, searcher, src_voc, tgt_voc, sent):
     sent = normalize_string(sent)
     output_words = evaluate(
-            device, encoder, decoder, generator, searcher, src_voc,
-            tgt_voc, sent
+            device, searcher, src_voc, tgt_voc, sent
             )
     output_words[:] = [x
                        for x in output_words
