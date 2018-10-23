@@ -17,7 +17,7 @@ class Runner:
     def __init__(self, args):
         self.args = args
         load_filename = args.load_filename
-        self.corpus_name = 'corpus_name'
+        self.corpus_name = args.corpus_name
 
         src_train_sents, tgt_train_sents, src_valid_sents, tgt_valid_sents,\
             src_voc, tgt_voc =\
@@ -181,7 +181,9 @@ class Runner:
             self.start_iteration = 1
 
     def train_iters(self):
-        for i_epoch in range(self.iteration_n):
+        '''Main training loop'''
+
+        for i_epoch in range(1, self.iteration_n + 1):
             train_loss = self.train_trainer.train_one_epoch()
             valid_loss = self.validator.calc_losses()
 
@@ -208,7 +210,7 @@ class Runner:
         if not os.path.exists(directory):
             os.makedirs(directory)
 
-        fname_format = '{}_{}_best.tar' if best else '{}_{}.tar'
+        fname_format = '{}_{}_best.pth' if best else '{}_{}.pth'
         fname = fname_format.format(iteration, 'translator')
 
         torch.save(
