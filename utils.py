@@ -26,7 +26,7 @@ class Trainer:
 
         # Compute loss
         translator = self.translator
-        loss = translator.score(
+        loss, print_loss = translator.score(
                 pair_batch,
                 train=True
                 )
@@ -34,16 +34,20 @@ class Trainer:
         # Clipping, backpropagate, optimize
         loss.backward()
 
-        nn.utils.clip_grad_norm_(translator.encoder, self.clip)
-        nn.utils.clip_grad_norm_(translator.decoder, self.clip)
-        nn.utils.clip_grad_norm_(translator.encoder_embedding, self.clip)
-        nn.utils.clip_grad_norm_(translator.decoder_embedding, self.clip)
-        nn.utils.clip_grad_norm_(translator.generator, self.clip)
+        nn.utils.clip_grad_norm_(translator.encoder.parameters(), self.clip)
+        nn.utils.clip_grad_norm_(translator.decoder.parameters(), self.clip)
+        nn.utils.clip_grad_norm_(
+                translator.encoder_embedding.parameters(), self.clip
+                )
+        nn.utils.clip_grad_norm_(
+                translator.decoder_embedding.parameters(), self.clip
+                )
+        nn.utils.clip_grad_norm_(translator.generator.parameters(), self.clip)
 
         for o in self.optimizers:
             o.step()
 
-        return loss
+        return print_loss
 
     def train_one_epoch(self):
 
@@ -51,7 +55,38 @@ class Trainer:
         self.corpus.initialize()
         while not self.corpus.is_final_batch:
             loss = self.step()
-            losses.append(loss.item())
+            losses.append(loss)
+
+        return np.mean(losses)
+
+
+class Validator:
+
+    def __init__(self, corpus, translator, batch_size):
+        self.corpus = corpus
+        self.translator = translator
+        self.batch_size = batch_size
+
+    def __calc_loss(self):
+
+        # Get batch
+        pair_batch = self.corpus.next_batch()
+
+        # Compute loss
+        _, print_loss = self.translator.score(
+                pair_batch,
+                train=False
+                )
+
+        return print_loss
+
+    def calc_losses(self):
+
+        losses = []
+        self.corpus.initialize()
+        while not self.corpus.is_final_batch:
+            loss = self.__calc_loss()
+            losses.append(loss)
 
         return np.mean(losses)
 
@@ -99,7 +134,12 @@ class Translator:
         self.__train(train)
 
         src, lens, tgt, mask, max_target_len =\
-            __batch_to_train_data(self.src_voc, self.tgt_voc, pair_batch)
+            batch_to_train_data(self.src_voc, self.tgt_voc, pair_batch)
+
+        src = src.to(self.device)
+        lens = lens.to(self.device)
+        tgt = tgt.to(self.device)
+        mask = mask.to(self.device)
 
         batch_size = src.size(1)
 
@@ -118,8 +158,8 @@ class Translator:
             True if random.random() < self.teacher_forcing_ratio else False
 
         loss = 0
-        # print_losses = []
-        # n_totals = 0
+        print_losses = []
+        n_totals = 0
 
         if train and use_teacher_forcing:
             for t in range(max_target_len):
@@ -131,8 +171,8 @@ class Translator:
                 mask_loss, n_total = self.__mask_nllloss(
                         decoder_output, tgt[t], mask[t])
                 loss += mask_loss
-                # print_losses.append(mask_loss.item() * n_total)
-                # n_totals += n_total
+                print_losses.append(mask_loss.item() * n_total)
+                n_totals += n_total
         else:
             for t in range(max_target_len):
                 decoder_output, decoder_hidden = self.decoder(
@@ -146,20 +186,20 @@ class Translator:
                 mask_loss, n_total = self.__mask_nllloss(
                         decoder_output, tgt[t], mask[t])
                 loss += mask_loss
-                # print_losses.append(mask_loss.item() * n_total)
-                # n_totals += n_total
+                print_losses.append(mask_loss.item() * n_total)
+                n_totals += n_total
 
-        return loss
+        return loss, sum(print_losses) / n_totals
 
     def greedy(self, sentences):
         pass
 
 
-def __zero_padding(l, fillvalue):
+def zero_padding(l, fillvalue):
     return list(itertools.zip_longest(*l, fillvalue=fillvalue))
 
 
-def __binary_matrix(l, value):
+def binary_matrix(l, value):
     m = []
     for i, seq in enumerate(l):
         m.append([])
@@ -171,32 +211,32 @@ def __binary_matrix(l, value):
     return m
 
 
-def __input_var(l, voc):
+def input_var(l, voc):
     indexes_batch = [voc.sent2idx(sentence)
                      for sentence in l]
     lengths = torch.tensor([len(indexes) for indexes in indexes_batch])
-    pad_list = __zero_padding(indexes_batch, voc.w2i['PAD'])
+    pad_list = zero_padding(indexes_batch, voc.w2i['PAD'])
     pad_var = torch.LongTensor(pad_list)
     return pad_var, lengths
 
 
-def __output_var(l, voc):
+def output_var(l, voc):
     indexes_batch = [voc.sent2idx(sentence)
                      for sentence in l]
     max_target_len = max([len(indexes) for indexes in indexes_batch])
-    pad_list = __zero_padding(indexes_batch, voc.w2i['PAD'])
-    mask = __binary_matrix(pad_list, voc.w2i['PAD'])
+    pad_list = zero_padding(indexes_batch, voc.w2i['PAD'])
+    mask = binary_matrix(pad_list, voc.w2i['PAD'])
     mask = torch.ByteTensor(mask)
     pad_var = torch.LongTensor(pad_list)
     return pad_var, mask, max_target_len
 
 
-def __batch_to_train_data(src_voc, tgt_voc, pair_batch):
+def batch_to_train_data(src_voc, tgt_voc, pair_batch):
     pair_batch.sort(key=lambda x: len(x[0].split(' ')), reverse=True)
     input_batch, output_batch = [], []
     for pair in pair_batch:
         input_batch.append(pair[0])
         output_batch.append(pair[1])
-    inp, lengths = __input_var(input_batch, src_voc)
-    output, mask, max_target_len = __output_var(output_batch, tgt_voc)
+    inp, lengths = input_var(input_batch, src_voc)
+    output, mask, max_target_len = output_var(output_batch, tgt_voc)
     return inp, lengths, output, mask, max_target_len
