@@ -1,6 +1,5 @@
 import os
 import random
-import itertools
 
 import torch
 import torch.nn as nn
@@ -11,6 +10,7 @@ import models
 from corpus import CorpusReader
 from utils import Translator
 from utils import Trainer
+from utils import Validator
 
 PAD_token = 0
 SOS_token = 1
@@ -89,8 +89,8 @@ class Runner:
         if load_filename:
             src_embedding.load_state_dict(src_embedding_sd)
             tgt_embedding.load_state_dict(tgt_embedding_sd)
-        self.src_embedding = src_embedding
-        self.tgt_embedding = tgt_embedding
+        self.src_embedding = src_embedding.to(device)
+        self.tgt_embedding = tgt_embedding.to(device)
 
         encoder = models.EncoderRNN(
                 self.hid_n, self.hid_n, self.encoder_layers_n, self.dropout
@@ -138,14 +138,14 @@ class Runner:
         self.src_embedding_optimizer = src_embedding_optimizer
         self.tgt_embedding_optimizer = tgt_embedding_optimizer
 
-        train_corpus = CorpusReader(
+        self.train_corpus = CorpusReader(
                 src_train_sents,
                 tgt_train_sents,
                 src_voc,
                 tgt_voc,
                 args.batch_size
                 )
-        train_translator = Translator(
+        self.train_translator = Translator(
                 src_embedding,
                 tgt_embedding,
                 generator,
@@ -156,8 +156,8 @@ class Runner:
                 args.teacher_forcing_ratio,
                 device
                 )
-        train_trainer = Trainer(
-                train_corpus,
+        self.train_trainer = Trainer(
+                self.train_corpus,
                 (
                     encoder_optimizer,
                     decoder_optimizer,
@@ -165,78 +165,28 @@ class Runner:
                     src_embedding_optimizer,
                     tgt_embedding_optimizer,
                     ),
-                train_translator,
+                self.train_translator,
                 self.batch_size,
                 self.clip
                 )
 
-        valid_corpus = CorpusReader(
+        self.valid_corpus = CorpusReader(
                 src_valid_sents,
                 tgt_valid_sents,
                 src_voc,
                 tgt_voc,
                 args.batch_size
                 )
+        self.validator = Validator(
+                self.valid_corpus,
+                self.train_translator,
+                self.batch_size
+                )
 
         if load_filename is not None:
             self.start_iteration = checkpoint['iteration'] + 1
         else:
             self.start_iteration = 1
-
-    def __indexes_from_sentence(self, voc, sentence):
-        return [voc.w2i.get(word, voc.w2i['UNK'])
-                for word in sentence.split(' ')] + [EOS_token]
-
-    def __zero_padding(self, l, fillvalue=PAD_token):
-        return list(itertools.zip_longest(*l, fillvalue=fillvalue))
-
-    def __binary_matrix(self, l, value=PAD_token):
-        m = []
-        for i, seq in enumerate(l):
-            m.append([])
-            for token in seq:
-                if token == PAD_token:
-                    m[i].append(0)
-                else:
-                    m[i].append(1)
-        return m
-
-    def __input_var(self, l, voc):
-        indexes_batch = [self.__indexes_from_sentence(voc, sentence)
-                         for sentence in l]
-        lengths = torch.tensor([len(indexes) for indexes in indexes_batch])
-        pad_list = self.__zero_padding(indexes_batch)
-        pad_var = torch.LongTensor(pad_list)
-        return pad_var, lengths
-
-    def __output_var(self, l, voc):
-        indexes_batch = [self.__indexes_from_sentence(voc, sentence)
-                         for sentence in l]
-        max_target_len = max([len(indexes) for indexes in indexes_batch])
-        pad_list = self.__zero_padding(indexes_batch)
-        mask = self.__binary_matrix(pad_list)
-        mask = torch.ByteTensor(mask)
-        pad_var = torch.LongTensor(pad_list)
-        return pad_var, mask, max_target_len
-
-    def __batch_to_train_data(self, src_voc, tgt_voc, pair_batch):
-        pair_batch.sort(key=lambda x: len(x[0].split(' ')), reverse=True)
-        input_batch, output_batch = [], []
-        for pair in pair_batch:
-            input_batch.append(pair[0])
-            output_batch.append(pair[1])
-        inp, lengths = self.__input_var(input_batch, src_voc)
-        output, mask, max_target_len = self.__output_var(output_batch, tgt_voc)
-        return inp, lengths, output, mask, max_target_len
-
-    def __mask_nllloss(self, inp, target, mask):
-        device = self.device
-
-        n_total = mask.sum()
-        cross_entropy = - torch.log(torch.gather(inp, 1, target.view(-1, 1)))
-        loss = cross_entropy.masked_select(mask).mean()
-        loss = loss.to(device)
-        return loss, n_total.item()
 
     def train_one_batch(self, input_variable, lengths, target_variable,
                         mask, max_target_len, max_length=MAX_LENGTH):
@@ -370,86 +320,12 @@ class Runner:
         return sum(print_losses) / n_totals
 
     def train_iters(self):
-        src_voc = self.src_voc
-        tgt_voc = self.tgt_voc
-        pairs = self.train_pairs
-
-        batch_size = self.batch_size
-        iteration_n = self.iteration_n
-        print_every = self.print_every
-        save_every = self.save_every
-
-        print('Initializing...')
-        start_iteration = 1
-        train_print_loss = 0
-        valid_print_loss = 0
-
-        start_iteration = self.start_iteration
-
-        print('Training...')
-        for iteration in range(start_iteration, iteration_n + 1):
-
-            loss_batch = 0
-            batch_n = 0
-            random.shuffle(pairs)
-            for start_idx in range(0, len(pairs), batch_size):
-
-                # Select samples for batch
-                end_idx = start_idx + batch_size
-                end_idx = end_idx if end_idx < len(pairs) else len(pairs)
-                pairs_batch = pairs[start_idx:end_idx]
-                training_batch = self.__batch_to_train_data(
-                        src_voc, tgt_voc, pairs_batch
-                        )
-                input_variable, lengths, target_variable,\
-                    mask, max_target_len = training_batch
-
-                loss = self.train_one_batch(
-                        input_variable, lengths, target_variable,
-                        mask, max_target_len
-                        )
-                loss_batch += loss
-                batch_n += 1
-
-                if batch_n % 100 == 0:
-                    print('loss: {:.5f}'.format(loss))
-
-            ave_loss = loss_batch / batch_n
-            train_print_loss += ave_loss
-
-            if iteration % print_every == 0:
-                valid_batch =\
-                    self.__batch_to_train_data(
-                        src_voc, tgt_voc, self.valid_pairs)
-                input_variable, lengths,\
-                    target_variable, mask, max_target_len = valid_batch
-
-                loss = self.calc_valid_loss(
-                        input_variable, lengths, target_variable,
-                        mask, max_target_len
-                        )
-                valid_print_loss += loss
-
-                if valid_print_loss < self.best_loss:
-                    print('Best loss achived!')
-                    self.best_loss = valid_print_loss
-                    self.dump_checkpoint(iteration, best=True)
-
-                print_loss_avg = train_print_loss / print_every
-                print(
-                        'Iteration: {}; Percent complete: {:.1f}%;\
-                        Average loss {:.5f}; Valid loss {:.5f}'.format(
-                            iteration,
-                            iteration / iteration_n * 100,
-                            print_loss_avg,
-                            valid_print_loss
-                            )
-                        )
-                train_print_loss = 0
-                valid_print_loss = 0
-
-            if (iteration % save_every == 0):
-                self.dump_checkpoint(iteration)
+        for i_epoch in range(self.iteration_n):
+            train_loss = self.train_trainer.train_one_epoch()
+            valid_loss = self.validator.calc_losses()
+            print('%dth epoch: loss -> %f, valid loss -> %f' % (
+                i_epoch, train_loss, valid_loss
+                ))
 
     def dump_checkpoint(self, iteration, best=False):
         save_dir = self.save_dir
