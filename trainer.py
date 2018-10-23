@@ -185,7 +185,7 @@ class Runner:
 
         for i_epoch in range(1, self.iteration_n + 1):
             train_loss = self.train_trainer.train_one_epoch()
-            valid_loss = self.validator.calc_losses()
+            valid_loss = self.validator.calc_score()
 
             print('%dth epoch: loss -> %f, valid loss -> %f' % (
                 i_epoch, train_loss, valid_loss
