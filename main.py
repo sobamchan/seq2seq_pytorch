@@ -10,6 +10,7 @@ def get_args():
     p.add_argument('-use_cuda', action='store_true')
 
     # Data config
+    p.add_argument('-corpus_name', type=str, default='corpus_name')
     p.add_argument('-train_src', type=str)
     p.add_argument('-train_tgt', type=str)
     p.add_argument('-valid_src', type=str)
