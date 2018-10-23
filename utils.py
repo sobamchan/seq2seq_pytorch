@@ -2,7 +2,7 @@ import random
 import itertools
 
 import numpy as np
-from nltk.bleu_score import sentence_bleu
+from nltk.translate.bleu_score import sentence_bleu
 
 import torch
 import torch.nn as nn
