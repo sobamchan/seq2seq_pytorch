@@ -10,15 +10,13 @@ class CorpusReader:
         self.src_voc = src_voc
         self.tgt_voc = tgt_voc
 
-        self.current_idx = 0
-        self.is_final_batch = False
         self.batch_size = batch_size
 
-    def prepare(self, sents):
-        pass
+        self.initialize()
 
     def initialize(self):
         self.current_idx = 0
+        self.is_final_batch = False
         random.shuffle(self.pairs)
 
     def next_batch(self):
