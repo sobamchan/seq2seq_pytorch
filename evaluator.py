@@ -63,7 +63,7 @@ def unicode_to_ascii(s):
 
 def evaluate(device, encoder, decoder, generator, searcher,
              src_voc, tgt_voc, sentence, max_length=MAX_LENGTH):
-    indexes_batch = [indexes_from_sentence(src_voc, sentence)]
+    indexes_batch = [src_voc.sent2idx(sentence)]
     lengths = torch.tensor([len(indexes) for indexes in indexes_batch])
     input_batch = torch.LongTensor(indexes_batch).transpose(0, 1)
     input_batch = input_batch.to(device)

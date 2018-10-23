@@ -6,6 +6,9 @@ import numpy as np
 import torch
 import torch.nn as nn
 
+from evaluator import GreedySearchDecoder
+from evaluator import evaluate_line
+
 
 class Trainer:
 
@@ -192,7 +195,25 @@ class Translator:
         return loss, sum(print_losses) / n_totals
 
     def greedy(self, sentences):
-        pass
+        searcher = GreedySearchDecoder(
+                self.device,
+                self.encoder,
+                self.decoder,
+                self.generator
+                )
+        pred_sentences = [
+                evaluate_line(
+                    self.device,
+                    self.encoder,
+                    self.decoder,
+                    self.generator,
+                    searcher,
+                    self.src_voc,
+                    self.tgt_voc,
+                    sentence
+                    )
+                for sentence in sentences]
+        return pred_sentences
 
 
 def zero_padding(l, fillvalue):
