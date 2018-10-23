@@ -1,5 +1,4 @@
 import os
-import random
 
 import torch
 import torch.nn as nn
@@ -11,13 +10,6 @@ from corpus import CorpusReader
 from utils import Translator
 from utils import Trainer
 from utils import Validator
-
-PAD_token = 0
-SOS_token = 1
-EOS_token = 2
-UNK_token = 3
-
-MAX_LENGTH = 10
 
 
 class Runner:
@@ -188,146 +180,20 @@ class Runner:
         else:
             self.start_iteration = 1
 
-    def train_one_batch(self, input_variable, lengths, target_variable,
-                        mask, max_target_len, max_length=MAX_LENGTH):
-
-        device = self.device
-        encoder = self.encoder
-        decoder = self.decoder
-        generator = self.generator
-
-        encoder.train()
-        decoder.train()
-        generator.train()
-
-        encoder_optimizer = self.encoder_optimizer
-        decoder_optimizer = self.decoder_optimizer
-        generator_optimizer = self.generator_optimizer
-
-        batch_size = input_variable.size(1)
-        clip = self.clip
-
-        encoder_optimizer.zero_grad()
-        decoder_optimizer.zero_grad()
-        generator_optimizer.zero_grad()
-
-        input_variable = input_variable.to(device)
-        lengths = lengths.to(device)
-        target_variable = target_variable.to(device)
-        mask = mask.to(device)
-
-        loss = 0
-        print_losses = []
-        n_totals = 0
-
-        encoder_outputs, encoder_hidden = encoder(input_variable, lengths)
-
-        decoder_input = torch.LongTensor([[SOS_token
-                                           for _ in range(batch_size)]])
-        decoder_input = decoder_input.to(device)
-
-        decoder_hidden = encoder_hidden[:decoder.layers_n]
-
-        use_teacher_forcing =\
-            True if random.random() < self.teacher_forcing_ratio else False
-
-        if use_teacher_forcing:
-            for t in range(max_target_len):
-                decoder_output, decoder_hidden = decoder(
-                        decoder_input, decoder_hidden, encoder_outputs,
-                        generator
-                        )
-                decoder_input = target_variable[t].view(1, -1)
-                mask_loss, n_total = self.__mask_nllloss(
-                        decoder_output, target_variable[t], mask[t])
-                loss += mask_loss
-                print_losses.append(mask_loss.item() * n_total)
-                n_totals += n_total
-        else:
-            for t in range(max_target_len):
-                decoder_output, decoder_hidden = decoder(
-                        decoder_input, decoder_hidden, encoder_outputs,
-                        generator
-                        )
-                _, decoder_max = decoder_output.max(dim=1)
-                decoder_input = torch.LongTensor([[decoder_max[i]
-                                                  for i in range(batch_size)]])
-                decoder_input = decoder_input.to(device)
-                mask_loss, n_total = self.__mask_nllloss(
-                        decoder_output, target_variable[t], mask[t])
-                loss += mask_loss
-                print_losses.append(mask_loss.item() * n_total)
-                n_totals += n_total
-
-        loss.backward()
-
-        nn.utils.clip_grad_norm_(encoder.parameters(), clip)
-        nn.utils.clip_grad_norm_(decoder.parameters(), clip)
-        nn.utils.clip_grad_norm_(generator.parameters(), clip)
-
-        encoder_optimizer.step()
-        decoder_optimizer.step()
-        generator_optimizer.step()
-
-        return sum(print_losses) / n_totals
-
-    def calc_valid_loss(self, input_variable, lengths, target_variable,
-                        mask, max_target_len, max_length=MAX_LENGTH):
-
-        device = self.device
-        encoder = self.encoder
-        decoder = self.decoder
-        generator = self.generator
-
-        encoder.eval()
-        decoder.eval()
-        generator.eval()
-
-        batch_size = input_variable.size(1)
-
-        input_variable = input_variable.to(device)
-        lengths = lengths.to(device)
-        target_variable = target_variable.to(device)
-        mask = mask.to(device)
-
-        loss = 0
-        print_losses = []
-        n_totals = 0
-
-        encoder_outputs, encoder_hidden = encoder(input_variable, lengths)
-
-        decoder_input = torch.LongTensor([[SOS_token
-                                           for _ in range(batch_size)]])
-        decoder_input = decoder_input.to(device)
-
-        decoder_hidden = encoder_hidden[:decoder.layers_n]
-
-        for t in range(max_target_len):
-            decoder_output, decoder_hidden = decoder(
-                    decoder_input, decoder_hidden, encoder_outputs,
-                    generator
-                    )
-            _, decoder_max = decoder_output.max(dim=1)
-            decoder_input = torch.LongTensor([[decoder_max[i]
-                                              for i in range(batch_size)]])
-            decoder_input = decoder_input.to(device)
-            mask_loss, n_total = self.__mask_nllloss(
-                    decoder_output, target_variable[t], mask[t])
-            loss += mask_loss
-            print_losses.append(mask_loss.item() * n_total)
-            n_totals += n_total
-
-        return sum(print_losses) / n_totals
-
     def train_iters(self):
         for i_epoch in range(self.iteration_n):
             train_loss = self.train_trainer.train_one_epoch()
             valid_loss = self.validator.calc_losses()
+
             print('%dth epoch: loss -> %f, valid loss -> %f' % (
                 i_epoch, train_loss, valid_loss
                 ))
 
-    def dump_checkpoint(self, iteration, best=False):
+            if i_epoch % self.save_every == 0:
+                dumped_to = self.dump(i_epoch)
+                print('Dumped model to %s' % dumped_to)
+
+    def dump(self, iteration, best=False):
         save_dir = self.save_dir
         model_name = self.model_name
         corpus_name = self.corpus_name
@@ -343,19 +209,13 @@ class Runner:
             os.makedirs(directory)
 
         fname_format = '{}_{}_best.tar' if best else '{}_{}.tar'
+        fname = fname_format.format(iteration, 'translator')
 
-        torch.save({
-            'iteration': iteration,
-            'en': self.encoder.state_dict(),
-            'de': self.decoder.state_dict(),
-            'generator': self.generator.state_dict(),
-            'en_opt': self.encoder_optimizer.state_dict(),
-            'de_opt': self.decoder_optimizer.state_dict(),
-            'src_voc_dict': self.src_voc.__dict__,
-            'tgt_voc_dict': self.tgt_voc.__dict__,
-            'src_embedding': self.src_embedding.state_dict(),
-            'tgt_embedding': self.tgt_embedding.state_dict(),
-            'args': self.args
-            },
-            os.path.join(directory,
-                         fname_format.format(iteration, 'checkpoint')))
+        torch.save(
+                self.train_translator,
+                os.path.join(
+                    directory, fname
+                    )
+                )
+
+        return fname
