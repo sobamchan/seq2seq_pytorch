@@ -192,7 +192,7 @@ class Runner:
         for i_epoch in range(1, self.iteration_n + 1):
             train_loss = self.train_trainer.train_one_epoch()
 
-            if i_epoch % self.print_every:
+            if i_epoch % self.print_every == 0:
                 _valid_loss = self.validator.calc_score()
                 _bleu = self.bleu_validator.calc_score()
                 print(
