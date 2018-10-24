@@ -10,6 +10,7 @@ from corpus import CorpusReader
 from utils import Translator
 from utils import Trainer
 from utils import Validator
+from utils import BleuValidator
 
 
 class Runner:
@@ -174,6 +175,11 @@ class Runner:
                 self.train_translator,
                 self.batch_size
                 )
+        self.bleu_validator = BleuValidator(
+                self.valid_corpus,
+                self.train_translator,
+                self.batch_size
+                )
 
         if load_filename is not None:
             self.start_iteration = checkpoint['iteration'] + 1
@@ -185,11 +191,14 @@ class Runner:
 
         for i_epoch in range(1, self.iteration_n + 1):
             train_loss = self.train_trainer.train_one_epoch()
-            valid_loss = self.validator.calc_score()
 
-            print('%dth epoch: loss -> %f, valid loss -> %f' % (
-                i_epoch, train_loss, valid_loss
-                ))
+            if i_epoch % self.print_every:
+                _valid_loss = self.validator.calc_score()
+                _bleu = self.bleu_validator.calc_score()
+                print(
+                        '%dth epoch: loss -> %f, valid loss -> %f, bleu -> %f'
+                        % (i_epoch, train_loss, _valid_loss, _bleu)
+                        )
 
             if i_epoch % self.save_every == 0:
                 dumped_to = self.dump(i_epoch)
