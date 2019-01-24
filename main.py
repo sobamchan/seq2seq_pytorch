@@ -8,6 +8,7 @@ def get_args():
 
     # Basic config
     p.add_argument('-use_cuda', action='store_true')
+    p.add_argument('-use_tensorboard', action='store_true')
 
     # Data config
     p.add_argument('-corpus_name', type=str, default='corpus_name')

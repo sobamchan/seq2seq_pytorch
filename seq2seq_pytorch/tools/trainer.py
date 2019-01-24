@@ -1,5 +1,7 @@
 import os
 
+from tensorboardX import SummaryWriter
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -39,6 +41,12 @@ class Runner:
                 tgt_voc.extract_topk(args.tgt_voc_size)
 
         self.save_dir = args.save_dir
+
+        # Tensorboard logger
+        if args.use_tensorboard:
+            self.tb_writer = SummaryWriter(self.save_dir)
+        else:
+            self.tb_writer = None
 
         self.src_voc = src_voc
         self.tgt_voc = tgt_voc
@@ -192,6 +200,12 @@ class Runner:
         for i_epoch in range(1, self.iteration_n + 1):
             train_loss = self.train_trainer.train_one_epoch()
 
+            # Tensorboard logging
+            if self.args.use_tensorboard:
+                self.tb_writer.add_scalar(
+                        'train/loss', train_loss, i_epoch
+                        )
+
             if i_epoch % self.print_every == 0:
                 _valid_loss = self.validator.calc_score()
                 _bleu = self.bleu_validator.calc_score()
@@ -199,6 +213,15 @@ class Runner:
                         '%dth epoch: loss -> %f, valid loss -> %f, bleu -> %f'
                         % (i_epoch, train_loss, _valid_loss, _bleu)
                         )
+
+                # Tensorboard logging
+                if self.args.use_tensorboard:
+                    self.tb_writer.add_scalar(
+                            'val/loss', _valid_loss, i_epoch
+                            )
+                    self.tb_writer.add_scalar(
+                            'val/bleu', _bleu, i_epoch
+                            )
 
             if i_epoch % self.save_every == 0:
                 dumped_to = self.dump(i_epoch)
