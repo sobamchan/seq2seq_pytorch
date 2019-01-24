@@ -4,13 +4,13 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-import data
-import models
-from corpus import CorpusReader
-from utils import Translator
-from utils import Trainer
-from utils import Validator
-from utils import BleuValidator
+from seq2seq_pytorch.dataset import data
+from seq2seq_pytorch.models import models
+from seq2seq_pytorch.dataset.corpus import CorpusReader
+from seq2seq_pytorch.tools.utils import Translator
+from seq2seq_pytorch.tools.utils import Trainer
+from seq2seq_pytorch.tools.utils import Validator
+from seq2seq_pytorch.tools.utils import BleuValidator
 
 
 class Runner:

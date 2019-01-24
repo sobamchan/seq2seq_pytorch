@@ -7,8 +7,8 @@ from nltk.translate.bleu_score import sentence_bleu
 import torch
 import torch.nn as nn
 
-from evaluator import GreedySearchDecoder
-from evaluator import evaluate_line
+from seq2seq_pytorch.tools.evaluator import GreedySearchDecoder
+from seq2seq_pytorch.tools.evaluator import evaluate_line
 
 
 class Trainer:

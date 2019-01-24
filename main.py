@@ -1,6 +1,6 @@
 import argparse
 
-from trainer import Runner
+from seq2seq_pytorch.tools.trainer import Runner
 
 
 def get_args():
