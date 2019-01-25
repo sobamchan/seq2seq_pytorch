@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 
 from tensorboardX import SummaryWriter
 
@@ -45,11 +46,14 @@ class Runner:
         model_name = args.model_name
         corpus_name = args.corpus_name
         self.save_dir = os.path.join(
-                save_dir_base, model_name, corpus_name, '{}-{}_{}'.format(
+                save_dir_base, model_name, corpus_name,
+                '{}-{}_{}'.format(
                     args.encoder_layers_n,
                     args.decoder_layers_n,
                     args.hid_n
-                    ))
+                    ),
+                datetime.now().strftime('%Y%m%d_%H%M%S')
+                )
 
         if not os.path.exists(self.save_dir):
             os.makedirs(self.save_dir)
