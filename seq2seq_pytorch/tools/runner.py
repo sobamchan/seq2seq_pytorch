@@ -40,7 +40,19 @@ class Runner:
             if args.tgt_voc_size is not None:
                 tgt_voc.extract_topk(args.tgt_voc_size)
 
-        self.save_dir = args.save_dir
+        # Determine directory to save things
+        save_dir_base = args.save_dir_base
+        model_name = args.model_name
+        corpus_name = args.corpus_name
+        self.save_dir = os.path.join(
+                save_dir_base, model_name, corpus_name, '{}-{}_{}'.format(
+                    args.encoder_layers_n,
+                    args.decoder_layers_n,
+                    args.hid_n
+                    ))
+
+        if not os.path.exists(self.save_dir):
+            os.makedirs(self.save_dir)
 
         # Tensorboard logger
         if args.use_tensorboard:
@@ -228,27 +240,13 @@ class Runner:
                 print('Dumped model to %s' % dumped_to)
 
     def dump(self, iteration, best=False):
-        save_dir = self.save_dir
-        model_name = self.model_name
-        corpus_name = self.corpus_name
-
-        directory = os.path.join(
-                save_dir, model_name, corpus_name, '{}-{}_{}'.format(
-                    self.encoder_layers_n,
-                    self.decoder_layers_n,
-                    self.hid_n
-                    ))
-
-        if not os.path.exists(directory):
-            os.makedirs(directory)
-
         fname_format = '{}_{}_best.pth' if best else '{}_{}.pth'
         fname = fname_format.format(iteration, 'translator')
 
         torch.save(
                 self.train_translator,
                 os.path.join(
-                    directory, fname
+                    self.save_dir, fname
                     )
                 )
 
