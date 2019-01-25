@@ -3,7 +3,19 @@ import numpy as np
 import torch.nn as nn
 
 
-class Trainer:
+class TrainerBase(object):
+
+    def __init__(self, corpus, optimizers, translator, batch_size, clip):
+        raise NotImplementedError
+
+    def step(self):
+        raise NotImplementedError
+
+    def train_one_epoch(self):
+        raise NotImplementedError
+
+
+class Trainer(TrainerBase):
 
     def __init__(self, corpus, optimizers, translator, batch_size, clip):
         self.corpus = corpus
