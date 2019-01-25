@@ -16,7 +16,19 @@ from seq2seq_pytorch.tools.validators import Validator
 from seq2seq_pytorch.tools.validators import BleuValidator
 
 
-class Runner:
+class RunnerBase(object):
+
+    def __init__(self, args):
+        raise NotImplementedError
+
+    def train_iters(self):
+        raise NotImplementedError
+
+    def dump(self, iteration, best=False):
+        raise NotImplementedError
+
+
+class Runner(RunnerBase):
     '''The Runner class holds information and instances which necessary for
     experiments and run iterations and dump checkpoints
     '''
