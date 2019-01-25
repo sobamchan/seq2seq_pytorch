@@ -9,10 +9,10 @@ import torch.optim as optim
 from seq2seq_pytorch.dataset import data
 from seq2seq_pytorch.models import models
 from seq2seq_pytorch.dataset.corpus import CorpusReader
-from seq2seq_pytorch.tools.utils import Translator
-from seq2seq_pytorch.tools.utils import Trainer
-from seq2seq_pytorch.tools.utils import Validator
-from seq2seq_pytorch.tools.utils import BleuValidator
+from seq2seq_pytorch.tools.translators import Translator
+from seq2seq_pytorch.tools.trainers import Trainer
+from seq2seq_pytorch.tools.validators import Validator
+from seq2seq_pytorch.tools.validators import BleuValidator
 
 
 class Runner:
