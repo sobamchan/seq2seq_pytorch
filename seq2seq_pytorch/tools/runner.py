@@ -17,12 +17,17 @@ from seq2seq_pytorch.tools.validators import BleuValidator
 
 
 class Runner:
+    '''The Runner class holds information and instances which necessary for
+    experiments and run iterations and dump checkpoints
+    '''
 
     def __init__(self, args):
         self.args = args
-        load_filename = args.load_filename
-        self.corpus_name = args.corpus_name
 
+        device = torch.device('cuda' if args.use_cuda else 'cpu')
+        self.device = device
+
+        # Load datas
         src_train_sents, tgt_train_sents, src_valid_sents, tgt_valid_sents,\
             src_voc, tgt_voc =\
             data.main(
@@ -32,6 +37,7 @@ class Runner:
                     args.valid_tgt
                     )
 
+        # Limit vocab
         if args.min_count is not None:
             src_voc.trim(args.min_count)
             tgt_voc.trim(args.min_count)
@@ -41,10 +47,15 @@ class Runner:
             if args.tgt_voc_size is not None:
                 tgt_voc.extract_topk(args.tgt_voc_size)
 
+        self.src_voc = src_voc
+        self.tgt_voc = tgt_voc
+
         # Determine directory to save things
+        self.corpus_name = args.corpus_name
         save_dir_base = args.save_dir_base
         model_name = args.model_name
         corpus_name = args.corpus_name
+
         self.save_dir = os.path.join(
                 save_dir_base, model_name, corpus_name,
                 '{}-{}_{}'.format(
@@ -58,18 +69,13 @@ class Runner:
         if not os.path.exists(self.save_dir):
             os.makedirs(self.save_dir)
 
-        # Tensorboard logger
+        # Tensorboard logger preparation
         if args.use_tensorboard:
             self.tb_writer = SummaryWriter(self.save_dir)
         else:
             self.tb_writer = None
 
-        self.src_voc = src_voc
-        self.tgt_voc = tgt_voc
-
-        device = torch.device('cuda' if args.use_cuda else 'cpu')
-        self.device = device
-
+        # Copy variables
         self.model_name = args.model_name
         self.attn_model = args.attn_model
         self.hid_n = args.hid_n
@@ -88,24 +94,10 @@ class Runner:
 
         self.best_loss = 1e+10
 
-        if load_filename is not None:
-            checkpoint = torch.load(load_filename)
-            encoder_sd = checkpoint['en']
-            decoder_sd = checkpoint['de']
-            generator_sd = checkpoint['generator']
-            encoder_optimizer_sd = checkpoint['en_opt']
-            decoder_optimizer_sd = checkpoint['de_opt']
-            src_embedding_sd = checkpoint['src_embedding']
-            tgt_embedding_sd = checkpoint['tgt_embedding']
-            src_voc.__dict__ = checkpoint['src_voc_dict']
-            tgt_voc.__dict__ = checkpoint['tgt_voc_dict']
-
+        # Build models
         print('Building encoder and decoder...')
         src_embedding = nn.Embedding(self.src_voc.num_words, self.hid_n)
         tgt_embedding = nn.Embedding(self.tgt_voc.num_words, self.hid_n)
-        if load_filename:
-            src_embedding.load_state_dict(src_embedding_sd)
-            tgt_embedding.load_state_dict(tgt_embedding_sd)
         self.src_embedding = src_embedding.to(device)
         self.tgt_embedding = tgt_embedding.to(device)
 
@@ -118,15 +110,32 @@ class Runner:
                 )
         generator = models.LinearGenerator(self.hid_n, self.tgt_voc.num_words)
 
-        if load_filename:
+        # Load checkpoint if there is
+        load_filename = args.load_filename
+        if load_filename is not None:
+            checkpoint = torch.load(load_filename)
+            encoder_sd = checkpoint['en']
+            decoder_sd = checkpoint['de']
+            generator_sd = checkpoint['generator']
+            encoder_optimizer_sd = checkpoint['en_opt']
+            decoder_optimizer_sd = checkpoint['de_opt']
+            src_embedding_sd = checkpoint['src_embedding']
+            tgt_embedding_sd = checkpoint['tgt_embedding']
+            src_voc.__dict__ = checkpoint['src_voc_dict']
+            tgt_voc.__dict__ = checkpoint['tgt_voc_dict']
+
             encoder.load_state_dict(encoder_sd)
             decoder.load_state_dict(decoder_sd)
             generator.load_state_dict(generator_sd)
+            src_embedding.load_state_dict(src_embedding_sd)
+            tgt_embedding.load_state_dict(tgt_embedding_sd)
 
+        # Transfer models to the designated device
         self.encoder = encoder.to(device)
         self.decoder = decoder.to(device)
         self.generator = generator.to(device)
 
+        # Instantiate optimizers
         encoder_optimizer = optim.Adam(
                 encoder.parameters(), lr=self.learning_rate)
         decoder_optimizer = optim.Adam(
@@ -155,6 +164,7 @@ class Runner:
         self.src_embedding_optimizer = src_embedding_optimizer
         self.tgt_embedding_optimizer = tgt_embedding_optimizer
 
+        # Prepare CorpusReader, Translator, Trainer, Validator  classes
         self.train_corpus = CorpusReader(
                 src_train_sents,
                 tgt_train_sents,

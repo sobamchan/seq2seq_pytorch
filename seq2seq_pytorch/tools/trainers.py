@@ -13,6 +13,7 @@ class Trainer:
         self.clip = clip
 
     def step(self):
+
         # Reset gradients
         for o in self.optimizers:
             o.zero_grad()
