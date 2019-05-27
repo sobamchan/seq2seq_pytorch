@@ -22,14 +22,15 @@ class EncoderRNN(nn.Module):
                 hid_n,
                 layers_n,
                 dropout=(0 if layers_n == 1 else dropout),
-                bidirectional=True
+                bidirectional=True,
+                batch_first=True
                 )
 
     def forward(self, inp_seq, inp_lengths, embedding, hid=None):
         embedded = embedding(inp_seq)
-        packed = nn.utils.rnn.pack_padded_sequence(embedded, inp_lengths)
+        packed = nn.utils.rnn.pack_padded_sequence(embedded, inp_lengths, batch_first=True, enforce_sorted=False)
         outputs, hidden = self.gru(packed, hid)
-        outputs, _ = nn.utils.rnn.pad_packed_sequence(outputs)
+        outputs, _ = nn.utils.rnn.pad_packed_sequence(outputs, batch_first=True)
 
         # Sum bidirectional GRU outputs
         outputs = outputs[:, :, :self.hid_n] + outputs[:, :, self.hid_n:]
@@ -110,7 +111,8 @@ class LuongAttnDecoderRNN(nn.Module):
                 hid_n,
                 hid_n,
                 layers_n,
-                dropout=(0 if layers_n == 1 else dropout)
+                dropout=(0 if layers_n == 1 else dropout),
+                batch_first=True
                 )
         self.concat = nn.Linear(hid_n * 2, hid_n)
         self.attn = Attn(attn_model, hid_n)
@@ -120,6 +122,9 @@ class LuongAttnDecoderRNN(nn.Module):
         # Note: we run this one step (word) at a time
         embedded = embedding(input_step)
         embedded = self.embedding_dropout(embedded)
+        print(embedded.size())
+        print(last_hid.size())
+        input()
         rnn_output, hid = self.gru(embedded, last_hid)
         attn_weights = self.attn(rnn_output, encoder_outputs)
 
