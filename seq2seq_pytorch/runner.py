@@ -13,16 +13,17 @@ def run():
     hid_n = 300
     encoder_layers_n = 1
     decoder_layers_n = 1
-    lr = 0.01
+    lr = 0.001
     dropout = 0.5
-    attn_model = 'dot'
+    attn_model = 'general'
     teacher_forcing_ratio = 0.5
     clip = 50.0
+    bsize = 512
     use_cuda = True
 
     device = torch.device('cuda' if use_cuda else 'cpu')
 
-    train_loader, valid_loader, src_t2i, tgt_t2i = data.get('./test', 32)
+    train_loader, valid_loader, src_t2i, tgt_t2i = data.get('./test', bsize)
 
     src_embedding = nn.Embedding(len(src_t2i), hid_n).to(device)
     tgt_embedding = nn.Embedding(len(tgt_t2i), hid_n).to(device)
@@ -57,7 +58,9 @@ def run():
             train_translator,
             clip
             )
-    train_trainer.train_one_epoch()
+    for _ in range(50):
+        loss = train_trainer.train_one_epoch()
+        print(loss)
 
 
 if __name__ == '__main__':

@@ -69,6 +69,7 @@ def get_collate_fn(src_pad_idx: int, tgt_pad_idx: int) -> Callable:
                 torch.LongTensor(padded_src),
                 torch.LongTensor(src_lens),
                 torch.LongTensor(padded_tgt),
+                torch.LongTensor(tgt_lens),
                 tgt_max_len
                 )
     return _f

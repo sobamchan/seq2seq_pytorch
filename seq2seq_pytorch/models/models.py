@@ -55,12 +55,22 @@ class Attn(nn.Module):
             self.attn = nn.Linear(hid_n * 2, hid_n)
             self.v = nn.Parameter(torch.FloatTensor(hid_n))
 
-    def dot_score(self, hid, encoder_output):
-        return torch.sum(hid * encoder_output, dim=2)
+    def dot_score(self, hid, encoder_outputs):
+        '''
+        hid: [1, B, H]
+        encoder_outputs: [B, S, H]
+        '''
+        _mid = hid * encoder_outputs  # [B, S, H]
+        return torch.sum(_mid, dim=2)
 
-    def general_score(self, hid, encoder_output):
-        energy = self.attn(encoder_output)
-        return torch.sum(hid * energy, dim=2)
+    def general_score(self, hid, encoder_outputs):
+        '''
+        hid: [1, B, H]
+        encoder_outputs: [B, S, H]
+        '''
+        energy = self.attn(encoder_outputs)  # [B, S, H]
+        _mid = hid * energy  # [B, S, H]
+        return torch.sum(_mid, dim=2)
 
     def concat_score(self, hid, encoder_output):
         energy = self.attn(torch.cat((hid.expand(encoder_output.size(0),
@@ -119,21 +129,32 @@ class LuongAttnDecoderRNN(nn.Module):
 
     def forward(self, input_step, last_hid, encoder_outputs,
                 generator, embedding):
-        # Note: we run this one step (word) at a time
-        embedded = embedding(input_step)
-        embedded = self.embedding_dropout(embedded)
-        print(embedded.size())
-        print(last_hid.size())
-        input()
-        rnn_output, hid = self.gru(embedded, last_hid)
-        attn_weights = self.attn(rnn_output, encoder_outputs)
+        '''
+        Note: we run this one step (word) at a time
+        IN:
+          - input_step: [1, B]
+          - encoder_outputs: [B, S, H]
+        OUT:
+          - output: [B, V_tgt]
+          - hid: [1, B, H]
+        '''
+        input_step = input_step.transpose(0, 1)  # [B, 1]
 
-        context = attn_weights.bmm(encoder_outputs.transpose(0, 1))
-        rnn_output = rnn_output.squeeze(0)
-        context = context.squeeze(1)
+        embedded = embedding(input_step)  # [B, 1, H]
+        embedded = self.embedding_dropout(embedded)
+
+        rnn_output, hid = self.gru(embedded, last_hid)  # [B, 1, H], [1, B, H]
+        attn_weights = self.attn(rnn_output, encoder_outputs)  # [S, 1, B]
+        attn_weights = attn_weights.transpose(0, 2)  # [B, 1, S]
+
+        context = attn_weights.bmm(encoder_outputs)  # [B, 1, H]
+
+        rnn_output = rnn_output.squeeze(1)  # [B, H]
+        context = context.squeeze(1)  # [B, H]
         concat_input = torch.cat((rnn_output, context), 1)
         concat_output = torch.tanh(self.concat(concat_input))
 
-        output = generator(concat_output)
-
+        output = generator(concat_output)  # [B, V_tgt]
+        output = F.log_softmax(output, dim=1)
+        # hid: [1, B, H]
         return output, hid

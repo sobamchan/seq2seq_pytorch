@@ -24,7 +24,7 @@ class Trainer(TrainerBase):
         self.clip = clip
 
     def step(self, batch):
-        src, lens, tgt, max_target_len = batch
+        src, src_lens, tgt, tgt_lens, max_target_len = batch
 
         # Reset gradients
         for o in self.optimizers:
@@ -32,14 +32,11 @@ class Trainer(TrainerBase):
 
         # Compute loss
         translator = self.translator
-        # loss, print_loss = translator.score(
-        #         pair_batch,
-        #         train=True
-        #         )
-        loss = translator.score(
+        loss, print_loss = translator.score(
                 src,
-                lens,
+                src_lens,
                 tgt,
+                tgt_lens,
                 max_target_len,
                 train=True
                 )
@@ -60,8 +57,7 @@ class Trainer(TrainerBase):
         for o in self.optimizers:
             o.step()
 
-        # return print_loss
-        return loss.item()
+        return print_loss
 
     def train_one_epoch(self):
 
