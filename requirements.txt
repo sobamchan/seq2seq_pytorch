@@ -2,3 +2,5 @@ torch
 torchvision
 nltk
 tensorboardX
+lineflow
+fire
