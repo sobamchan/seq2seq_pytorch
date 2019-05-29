@@ -1,6 +1,6 @@
 import os.path as osp
 from pathlib import Path
-from typing import List, Dict, Callable
+from typing import List, Dict, Callable, Tuple
 from collections import Counter
 import pickle
 
@@ -17,7 +17,7 @@ PAD_TOKEN = '<pad>'
 UNK_TOKEN = '<unk>'
 
 
-def preprocess(x: List):
+def preprocess(x: Tuple):
     src_str: str = x[0]
     tgt_str: str = x[1]
     return (
