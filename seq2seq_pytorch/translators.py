@@ -66,10 +66,11 @@ class Translator:
                 )
 
         # Prepare to decode
-        decoder_input = torch.LongTensor([[self.tgt_voc['<s>']
-                                           for _ in range(bsize)]])
+        decoder_input = torch.LongTensor([self.tgt_voc['<s>']
+                                          for _ in range(bsize)])
         decoder_input = decoder_input.to(self.device)
         decoder_hidden = encoder_hidden[:self.decoder.layers_n]
+        # decoder_hidden: [nlayers, B, H]
 
         use_teacher_forcing =\
             True if random.random() < self.teacher_forcing_ratio else False
@@ -80,24 +81,34 @@ class Translator:
 
         if train and use_teacher_forcing:
             for t in range(max_target_len):
+
+                # Decode
                 decoder_output, decoder_hidden = self.decoder(
                         decoder_input, decoder_hidden, encoder_outputs,
                         self.generator, self.decoder_embedding
                         )
-                decoder_input = tgt[:, t].view(1, -1)
+
+                decoder_input = tgt[:, t]
+                # tgt: [B, S]
+                # decoder_input: [B]
+
+                # Calculate loss
                 _loss = self.criterion(decoder_output, tgt[:, t])
                 loss += _loss
                 print_losses.append(_loss.item())
                 n_totals += 1
         else:
             for t in range(max_target_len):
+
                 decoder_output, decoder_hidden = self.decoder(
                         decoder_input, decoder_hidden, encoder_outputs,
                         self.generator, self.decoder_embedding
                         )
+
                 _, decoder_max = decoder_output.max(dim=1)
-                decoder_input = torch.LongTensor([[decoder_max[i]
-                                                  for i in range(bsize)]])
+                decoder_input = torch.LongTensor([decoder_max[i]
+                                                 for i in range(bsize)])
+                # decoder_input: B
                 decoder_input = decoder_input.to(self.device)
                 loss += self.criterion(decoder_output, tgt[:, t])
 
@@ -105,6 +116,37 @@ class Translator:
                 print_losses.append(loss.item())
 
         return loss, sum(print_losses) / torch.sum(tgt_lens).item()
+
+    def translate(self, src, src_lens, max_target_len):
+        self.__train(False)
+        src = src.to(self.device)
+        src_lens = src_lens.to(self.device)
+        bsize = src.size(0)
+
+        encoder_outputs, encoder_hidden = self.encoder(
+                src, src_lens, embedding=self.encoder_embedding
+                )
+
+        decoder_input = torch.LongTensor([
+            self.tgt_voc['<s>'] for _ in range(bsize)
+            ])
+        decoder_input = decoder_input.to(self.device)
+        decoder_hidden = encoder_hidden[:self.decoder.layers_n]
+
+        tgt_seqs = torch.zeros(bsize, max_target_len)
+        for t in range(max_target_len):
+            decoder_output, decoder_hidden = self.decoder(
+                    decoder_input, decoder_hidden, encoder_outputs,
+                    self.generator, self.decoder_embedding
+                    )
+            _, decoder_max = decoder_output.max(dim=1)  # [B]
+            decoder_input = torch.LongTensor([
+                decoder_max[i] for i in range(bsize)
+                ])
+            decoder_input = decoder_input.to(self.device)
+
+            tgt_seqs[:, t] = decoder_max
+        return tgt_seqs
 
     def greedy(self, sentences):
         searcher = GreedySearchDecoder(

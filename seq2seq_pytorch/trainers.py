@@ -67,3 +67,11 @@ class Trainer(TrainerBase):
             losses.append(loss)
 
         return np.mean(losses)
+
+    def test(self):
+        for batch in self.dataloader:
+            src, src_lens, tgt, tgt_lens, max_target_len = batch
+            pred_seqs = self.translator.translate(src, src_lens, max_target_len)
+            print(tgt[0])
+            print(pred_seqs[0])
+            break

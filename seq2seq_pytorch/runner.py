@@ -13,10 +13,10 @@ def run():
     hid_n = 300
     encoder_layers_n = 1
     decoder_layers_n = 1
-    lr = 0.001
+    lr = 0.0001
     dropout = 0.5
     attn_model = 'general'
-    teacher_forcing_ratio = 0.5
+    teacher_forcing_ratio = 1.0
     clip = 50.0
     bsize = 512
     use_cuda = True
@@ -58,9 +58,10 @@ def run():
             train_translator,
             clip
             )
-    for _ in range(50):
+    for _ in range(30):
         loss = train_trainer.train_one_epoch()
         print(loss)
+    train_trainer.test()
 
 
 if __name__ == '__main__':

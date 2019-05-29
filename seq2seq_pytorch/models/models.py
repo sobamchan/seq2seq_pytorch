@@ -1,6 +1,8 @@
 import torch
 import torch.nn.functional as F
 import torch.nn as nn
+from torch.nn.utils.rnn import pack_padded_sequence
+from torch.nn.utils.rnn import pad_packed_sequence
 
 PAD_token = 0
 SOS_token = 1
@@ -27,13 +29,21 @@ class EncoderRNN(nn.Module):
                 )
 
     def forward(self, inp_seq, inp_lengths, embedding, hid=None):
-        embedded = embedding(inp_seq)
-        packed = nn.utils.rnn.pack_padded_sequence(embedded, inp_lengths, batch_first=True, enforce_sorted=False)
+        '''
+        IN:
+          - inp_seq: [B, S]
+          - inp_lengths: [B]
+        '''
+        embedded = embedding(inp_seq)  # [B, S, H]
+        packed = pack_padded_sequence(embedded, inp_lengths, batch_first=True, enforce_sorted=False)
         outputs, hidden = self.gru(packed, hid)
-        outputs, _ = nn.utils.rnn.pad_packed_sequence(outputs, batch_first=True)
+        outputs, _ = pad_packed_sequence(outputs, batch_first=True)
+        # outputs: [B, S, bidirectional * H]
+        # hidden: [bidirectional * nlayers, B, H]
 
         # Sum bidirectional GRU outputs
         outputs = outputs[:, :, :self.hid_n] + outputs[:, :, self.hid_n:]
+        # outputs: [B, S, H]
 
         return outputs, hidden
 
@@ -65,12 +75,12 @@ class Attn(nn.Module):
 
     def general_score(self, hid, encoder_outputs):
         '''
-        hid: [1, B, H]
+        hid: [B, 1, bidirectional * H]
         encoder_outputs: [B, S, H]
         '''
-        energy = self.attn(encoder_outputs)  # [B, S, H]
-        _mid = hid * energy  # [B, S, H]
-        return torch.sum(_mid, dim=2)
+        energy = self.attn(encoder_outputs)  # [B, S, bidirectional * H]
+        _mid = hid * energy  # [B, S, bidirectional * H]
+        return torch.sum(_mid, dim=2)  # [B, S]
 
     def concat_score(self, hid, encoder_output):
         energy = self.attn(torch.cat((hid.expand(encoder_output.size(0),
@@ -88,7 +98,7 @@ class Attn(nn.Module):
         elif self.method == 'dot':
             attn_energies = self.dot_score(hid, encoder_outputs)
 
-        attn_energies = attn_energies.t()
+        # attn_energies = attn_energies.t()
 
         return F.softmax(attn_energies, dim=1).unsqueeze(1)
 
@@ -101,7 +111,8 @@ class LinearGenerator(nn.Module):
         self.logsoftmax = nn.Softmax(dim=1)
 
     def forward(self, hid):
-        return self.logsoftmax(self.out(hid))
+        return self.out(hid)
+        # return self.logsoftmax(self.out(hid))
 
 
 class LuongAttnDecoderRNN(nn.Module):
@@ -130,24 +141,24 @@ class LuongAttnDecoderRNN(nn.Module):
     def forward(self, input_step, last_hid, encoder_outputs,
                 generator, embedding):
         '''
-        Note: we run this one step (word) at a time
+        Note: One step (word) at a time.
+
         IN:
-          - input_step: [1, B]
+          - input_step: [B]
+          - last_hid: [nlayers_dec, B, H]
           - encoder_outputs: [B, S, H]
         OUT:
           - output: [B, V_tgt]
           - hid: [1, B, H]
         '''
-        input_step = input_step.transpose(0, 1)  # [B, 1]
-
-        embedded = embedding(input_step)  # [B, 1, H]
+        embedded = embedding(input_step)  # [B, H]
+        embedded = embedded.unsqueeze(1)  # [B, 1, H]
         embedded = self.embedding_dropout(embedded)
 
-        rnn_output, hid = self.gru(embedded, last_hid)  # [B, 1, H], [1, B, H]
-        attn_weights = self.attn(rnn_output, encoder_outputs)  # [S, 1, B]
-        attn_weights = attn_weights.transpose(0, 2)  # [B, 1, S]
+        rnn_output, hid = self.gru(embedded, last_hid)  # [B, 1, bidirectional * H], [nlayers * bidirectional, B, H]
+        attn_weights = self.attn(rnn_output, encoder_outputs)  # [B, 1, bidirectional * H] * [B, S, H] -> [B, 1, S]
 
-        context = attn_weights.bmm(encoder_outputs)  # [B, 1, H]
+        context = attn_weights.bmm(encoder_outputs)  # [B, 1, S] * [B, S, H] -> [B, 1, H]
 
         rnn_output = rnn_output.squeeze(1)  # [B, H]
         context = context.squeeze(1)  # [B, H]

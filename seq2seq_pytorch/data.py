@@ -26,7 +26,7 @@ def preprocess(x: List):
             )
 
 
-def build_vocab(tokens: List, cache: str, max_size: int = 500000) -> (Dict, List):
+def build_vocab(tokens: List, cache: str, max_size: int = 5000) -> (Dict, List):
     if not osp.isfile(cache):
         counter = Counter(tokens)
         words, _ = zip(*counter.most_common(max_size))
