@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.optim as optim
 
 
-from seq2seq_pytorch.trainers import Trainer, BleuValidator
+from seq2seq_pytorch.trainers import Trainer, BleuValidator, LossValidator
 from seq2seq_pytorch.translators import Translator
 from seq2seq_pytorch import models
 from seq2seq_pytorch import data
@@ -14,7 +14,7 @@ from seq2seq_pytorch import data
 def run(hid_n: int = 300, encoder_layers_n: int = 3, decoder_layers_n: int = 3,
         lr: float = 0.001, dropout: float = 0.5, attn_model: str = 'general', teacher_forcing_ratio: float = 1.0,
         clip: float = 50.0, vocab_size: int = 5000, bsize: int = 512, epoch: int = 50,
-        use_cuda: bool = True, data_cache_path: str = './test'):
+        use_cuda: bool = True, data_cache_path: str = './test', savepath: str = None):
 
     device = torch.device('cuda' if use_cuda else 'cpu')
 
@@ -59,11 +59,19 @@ def run(hid_n: int = 300, encoder_layers_n: int = 3, decoder_layers_n: int = 3,
             train_translator
             )
 
+    loss_validator = LossValidator(
+            valid_loader,
+            train_translator
+            )
+
     for _ in range(epoch):
         loss = train_trainer.train_one_epoch()
         bleu, src_sents, pred_sents, tgt_sents = bleu_validator.calc_score()
+        valid_loss = loss_validator.calc_score()
+
         print(f'Loss: {loss}')
         print(f'Bleu: {bleu}')
+        print(f'Valid loss: {valid_loss}')
 
         print(f'Source sentence: {src_sents[1]}')
         print(f'Generated sentence: {pred_sents[1]}')

@@ -92,7 +92,6 @@ class Translator:
                 # decoder_input: [B]
 
                 # Calculate loss
-                # _loss = self.criterion(decoder_output, tgt[:, t])
                 _loss, ntotal = self.__mask_nllloss(decoder_output, tgt[:, t], mask[:, t])
                 loss += _loss
                 print_losses.append(_loss.item() * ntotal)
@@ -110,10 +109,9 @@ class Translator:
                                                  for i in range(bsize)])
                 # decoder_input: B
                 decoder_input = decoder_input.to(self.device)
-                # loss += self.criterion(decoder_output, tgt[:, t])
                 _loss, ntotal = self.__mask_nllloss(decoder_output, tgt[:, t], mask[:, t])
-
-                print_losses.append(loss.item() * ntotal)
+                loss += _loss
+                print_losses.append(_loss.item() * ntotal)
                 n_totals += ntotal
 
         return loss, sum(print_losses) / torch.sum(tgt_lens).item()
