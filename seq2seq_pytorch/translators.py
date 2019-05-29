@@ -24,11 +24,12 @@ class Translator:
         self.teacher_forcing_ratio = teacher_forcing_ratio
         self.criterion = nn.NLLLoss()
 
-    def __mask_nllloss(self, inp, target, mask):
+    def __mask_nllloss(self, inp, tgt, mask):
         device = self.device
 
         n_total = mask.sum()
-        cross_entropy = - torch.log(torch.gather(inp, 1, target.view(-1, 1)))
+        # cross_entropy = - torch.log(torch.gather(inp, 1, target.view(-1, 1)))
+        cross_entropy = self.criterion(inp, tgt)
         loss = cross_entropy.masked_select(mask).mean()
         loss = loss.to(device)
         return loss, n_total.item()
@@ -47,7 +48,7 @@ class Translator:
             self.decoder.eval()
             self.generator.eval()
 
-    def score(self, src, src_lens, tgt, tgt_lens, max_target_len, train=True):
+    def score(self, src, src_lens, tgt, tgt_lens, mask, max_target_len, train=True):
         '''
         tgt: [B, S]
         '''
@@ -57,6 +58,7 @@ class Translator:
         src_lens = src_lens.to(self.device)
         tgt = tgt.to(self.device)
         tgt_lens = tgt_lens.to(self.device)
+        mask = mask.to(self.device)
 
         bsize = src.size(0)
 
@@ -93,10 +95,11 @@ class Translator:
                 # decoder_input: [B]
 
                 # Calculate loss
-                _loss = self.criterion(decoder_output, tgt[:, t])
+                # _loss = self.criterion(decoder_output, tgt[:, t])
+                _loss, ntotal = self.__mask_nllloss(decoder_output, tgt[:, t], mask[:, t])
                 loss += _loss
-                print_losses.append(_loss.item())
-                n_totals += 1
+                print_losses.append(_loss.item() * ntotal)
+                n_totals += ntotal
         else:
             for t in range(max_target_len):
 
@@ -110,10 +113,11 @@ class Translator:
                                                  for i in range(bsize)])
                 # decoder_input: B
                 decoder_input = decoder_input.to(self.device)
-                loss += self.criterion(decoder_output, tgt[:, t])
+                # loss += self.criterion(decoder_output, tgt[:, t])
+                _loss, ntotal = self.__mask_nllloss(decoder_output, tgt[:, t], mask[:, t])
 
-                n_totals += 1
-                print_losses.append(loss.item())
+                print_losses.append(loss.item() * ntotal)
+                n_totals += ntotal
 
         return loss, sum(print_losses) / torch.sum(tgt_lens).item()
 
@@ -147,23 +151,3 @@ class Translator:
 
             tgt_seqs[:, t] = decoder_max
         return tgt_seqs
-
-    def greedy(self, sentences):
-        searcher = GreedySearchDecoder(
-                self.device,
-                self.encoder_embedding,
-                self.decoder_embedding,
-                self.generator,
-                self.encoder,
-                self.decoder
-                )
-        pred_sentences = [
-                evaluate_line(
-                    self.device,
-                    searcher,
-                    self.src_voc,
-                    self.tgt_voc,
-                    sentence
-                    )
-                for sentence in sentences]
-        return pred_sentences

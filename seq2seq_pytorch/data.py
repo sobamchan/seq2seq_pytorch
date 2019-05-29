@@ -56,7 +56,7 @@ def postprocess(src_t2i, src_unk_idx, tgt_t2i, tgt_unk_idx):
 
 
 def get_collate_fn(src_pad_idx: int, tgt_pad_idx: int) -> Callable:
-    def _f(batch):
+    def _f(batch: List):
         src, tgt = zip(*batch)
         src_lens = [len(x) for x in src]
         src_max_len = max(src_lens)
@@ -65,11 +65,16 @@ def get_collate_fn(src_pad_idx: int, tgt_pad_idx: int) -> Callable:
 
         padded_src = [x + [src_pad_idx] * (src_max_len - len(x)) for x in src]
         padded_tgt = [x + [tgt_pad_idx] * (tgt_max_len - len(x)) for x in tgt]
+
+        # Generate tgt mask tensor.
+        mask = [[{tgt_pad_idx: 0}.get(_id, 1) for _id in x] for x in padded_tgt]
+
         return (
                 torch.LongTensor(padded_src),
                 torch.LongTensor(src_lens),
                 torch.LongTensor(padded_tgt),
                 torch.LongTensor(tgt_lens),
+                torch.ByteTensor(mask),
                 tgt_max_len
                 )
     return _f

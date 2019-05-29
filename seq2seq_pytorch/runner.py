@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.optim as optim
 
 
-from seq2seq_pytorch.trainers import Trainer
+from seq2seq_pytorch.trainers import Trainer, BleuValidator
 from seq2seq_pytorch.translators import Translator
 from seq2seq_pytorch.models import models
 from seq2seq_pytorch import data
@@ -11,9 +11,9 @@ from seq2seq_pytorch import data
 
 def run():
     hid_n = 300
-    encoder_layers_n = 1
-    decoder_layers_n = 1
-    lr = 0.0001
+    encoder_layers_n = 3
+    decoder_layers_n = 3
+    lr = 0.001
     dropout = 0.5
     attn_model = 'general'
     teacher_forcing_ratio = 1.0
@@ -58,9 +58,22 @@ def run():
             train_translator,
             clip
             )
+
+    bleu_validator = BleuValidator(
+            valid_loader,
+            train_translator
+            )
+
     for _ in range(30):
         loss = train_trainer.train_one_epoch()
-        print(loss)
+        bleu, src_sents, pred_sents, tgt_sents = bleu_validator.calc_score()
+        print(f'Loss: {loss}')
+        print(f'Bleu: {bleu}')
+
+        print(f'Source sentence: {src_sents[1]}')
+        print(f'Generated sentence: {pred_sents[1]}')
+        print(f'Target sentence: {tgt_sents[1]}')
+
     train_trainer.test()
 
 
