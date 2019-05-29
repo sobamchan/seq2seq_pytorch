@@ -74,14 +74,6 @@ class Trainer(TrainerBase):
 
         return np.mean(losses)
 
-    def test(self):
-        for batch in self.dataloader:
-            src, src_lens, tgt, _, _, max_target_len = batch
-            pred_seqs = self.translator.translate(src, src_lens, max_target_len)
-            print(tgt[0])
-            print(pred_seqs[0])
-            break
-
 
 class BaseValidator:
 

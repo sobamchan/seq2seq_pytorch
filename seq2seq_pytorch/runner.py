@@ -74,8 +74,6 @@ def run():
         print(f'Generated sentence: {pred_sents[1]}')
         print(f'Target sentence: {tgt_sents[1]}')
 
-    train_trainer.test()
-
 
 if __name__ == '__main__':
     run()
