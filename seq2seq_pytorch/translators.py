@@ -3,9 +3,6 @@ import random
 import torch
 import torch.nn as nn
 
-from seq2seq_pytorch.tools.evaluator import GreedySearchDecoder
-from seq2seq_pytorch.tools.evaluator import evaluate_line
-
 
 class Translator:
 

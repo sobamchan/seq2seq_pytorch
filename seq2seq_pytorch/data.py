@@ -80,7 +80,7 @@ def get_collate_fn(src_pad_idx: int, tgt_pad_idx: int) -> Callable:
     return _f
 
 
-def get(savepath: str, bsize: int = 32) -> (DataLoader, DataLoader, Dict, Dict):
+def get(savepath: str, bsize: int = 32, vocab_size: int = 5000) -> (DataLoader, DataLoader, Dict, Dict):
     savepath = Path(savepath)
 
     print('Reading...')
@@ -94,8 +94,8 @@ def get(savepath: str, bsize: int = 32) -> (DataLoader, DataLoader, Dict, Dict):
     tgt_tokens: List = lf.flat_map(lambda x: x[1], train + validation, lazy=True)  # ja
 
     print('Building vocabulary...')
-    src_t2i, _ = build_vocab(src_tokens, savepath / 'src.voacb')
-    tgt_t2i, _ = build_vocab(tgt_tokens, savepath / 'tgt.voacb')
+    src_t2i, _ = build_vocab(src_tokens, savepath / 'src.voacb', vocab_size)
+    tgt_t2i, _ = build_vocab(tgt_tokens, savepath / 'tgt.voacb', vocab_size)
 
     print(f'Source vocab size: {len(src_t2i)}')
     print(f'Target Vocab size: {len(tgt_t2i)}')
