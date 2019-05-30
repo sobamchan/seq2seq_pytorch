@@ -79,7 +79,7 @@ class Translator:
         n_totals = 0
 
         if train and use_teacher_forcing:
-            for t in range(max_target_len):
+            for t in range(1, max_target_len):
 
                 # Decode
                 decoder_output, decoder_hidden = self.decoder(
