@@ -6,7 +6,7 @@ from nltk.translate.bleu_score import sentence_bleu
 import torch.nn as nn
 from torch.utils.data import DataLoader
 
-from seq2seq_pytorch.data import PAD_TOKEN
+from seq2seq_pytorch.data import PAD_TOKEN, END_TOKEN, START_TOKEN
 from seq2seq_pytorch.translators import Translator
 
 
@@ -92,8 +92,8 @@ class BleuValidator(ValidatorBase):
         self.dataloader = dataloader
         self.translator = translator
 
-    def trim_pad(self, tokens):
-        return [token for token in tokens if token != PAD_TOKEN]
+    def trim_special_tokens(tokens):
+        return [token for token in tokens if token not in [PAD_TOKEN, END_TOKEN, START_TOKEN]]
 
     def calc_score(self) -> (float, List):
 
@@ -117,9 +117,9 @@ class BleuValidator(ValidatorBase):
                 ptokens = [ti2t.get(int(pid)) for pid in pids]
                 ttokens = [ti2t.get(int(tid)) for tid in tids]
 
-                stokens = self.trim_pad(stokens)
-                ptokens = self.trim_pad(ptokens)
-                ttokens = self.trim_pad(ttokens)
+                stokens = self.trim_special_tokens(stokens)
+                ptokens = self.trim_special_tokens(ptokens)
+                ttokens = self.trim_special_tokens(ttokens)
 
                 ssent = ' '.join(stokens)
                 psent = ' '.join(ptokens)
