@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import fire
 
 import torch
@@ -14,7 +16,9 @@ from seq2seq_pytorch import data
 def run(hid_n: int = 300, encoder_layers_n: int = 3, decoder_layers_n: int = 3,
         lr: float = 0.001, dropout: float = 0.5, attn_model: str = 'general', teacher_forcing_ratio: float = 1.0,
         clip: float = 50.0, vocab_size: int = 5000, bsize: int = 512, epoch: int = 50,
-        use_cuda: bool = True, data_cache_path: str = './test', savepath: str = None):
+        use_cuda: bool = True, data_cache_path: str = './test', savedir: str = None, save_every: int = 5):
+
+    savedir = Path(savedir) if savedir else None
 
     device = torch.device('cuda' if use_cuda else 'cpu')
 
@@ -64,7 +68,9 @@ def run(hid_n: int = 300, encoder_layers_n: int = 3, decoder_layers_n: int = 3,
             train_translator
             )
 
-    for _ in range(epoch):
+    best_bleu = 0
+
+    for iepoch in range(1, epoch + 1):
         loss = train_trainer.train_one_epoch()
         bleu, src_sents, pred_sents, tgt_sents = bleu_validator.calc_score()
         valid_loss = loss_validator.calc_score()
@@ -76,6 +82,25 @@ def run(hid_n: int = 300, encoder_layers_n: int = 3, decoder_layers_n: int = 3,
         print(f'Source sentence: {src_sents[1]}')
         print(f'Generated sentence: {pred_sents[1]}')
         print(f'Target sentence: {tgt_sents[1]}')
+
+        if best_bleu < bleu:
+            best_bleu = bleu
+            print('Achived best bleu!')
+            # Dump
+            dump(train_translator, savedir, f'translator.best.pth')
+
+        if iepoch % save_every == 0:
+            # Dump
+            dump(train_translator, savedir, f'translator.{iepoch}.pth')
+
+
+def dump(translator: Translator, savedir: Path, fname: str):
+    if savedir:
+        savepath = savedir / fname
+        print(f'Dumping translator to {savepath}')
+        torch.save(translator, savepath)
+    else:
+        print('No savedir is gave. Skip dumping...')
 
 
 if __name__ == '__main__':
