@@ -25,7 +25,6 @@ class Translator:
         device = self.device
 
         n_total = mask.sum()
-        # cross_entropy = - torch.log(torch.gather(inp, 1, target.view(-1, 1)))
         cross_entropy = self.criterion(inp, tgt)
         loss = cross_entropy.masked_select(mask).mean()
         loss = loss.to(device)
